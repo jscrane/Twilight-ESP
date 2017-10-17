@@ -51,7 +51,7 @@ void config::configure(const char *p, const char *q) {
       pir_idx = atoi(q);
 }
 
-#define PIR   13
+#define PIR   4
 #define POWER 5
 #define HZ    4
 #define SAMPLES (15*HZ)
