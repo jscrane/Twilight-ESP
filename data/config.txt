@@ -5,5 +5,5 @@ mqtt_server=iot.lan
 interval_time=10
 inactive_time=300
 threshold=750
-device_switch=22
-device_pir=23
+switch_idx=22
+pir_idx=23

@@ -1,3 +1,4 @@
+#include <ArduinoJson.h>
 #include <FS.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
@@ -9,7 +10,7 @@ WiFiClient wifiClient;
 PubSubClient mqtt_client(wifiClient);
 MDNSResponder mdns;
 
-
+//#define DEBUG
 #define INTERVAL_TIME   10
 #define INACTIVE_TIME   300
 #define THRESHOLD       750
@@ -23,12 +24,13 @@ public:
   int interval_time = INTERVAL_TIME;
   int inactive_time = INACTIVE_TIME;
   int threshold = THRESHOLD;
-  int device_switch, device_pir;
+  int switch_idx = -1;
+  int pir_idx = -1;
 
-  void entry(const char *key, const char *value);
+  void configure(const char *key, const char *value);
 } cfg;
 
-void config::entry(const char *p, const char *q) {
+void config::configure(const char *p, const char *q) {
     if (strcmp(p, "ssid") == 0)
       strncpy(ssid, q, sizeof(ssid));
     else if (strcmp(p, "password") == 0)
@@ -38,15 +40,15 @@ void config::entry(const char *p, const char *q) {
     else if (strcmp(p, "mqtt_server") == 0)
       strncpy(mqtt_server, q, sizeof(mqtt_server));
     else if (strcmp(p, "interval_time") == 0)
-      interval_time = atoi(p);
+      interval_time = atoi(q);
     else if (strcmp(p, "inactive_time") == 0)
-      inactive_time = atoi(p);
+      inactive_time = atoi(q);
     else if (strcmp(p, "threshold") == 0)
-      threshold = atoi(p);    
-    else if (strcmp(p, "device_switch") == 0)
-      device_switch = atoi(p);    
-    else if (strcmp(p, "device_pir") == 0)
-      device_pir = atoi(p);    
+      threshold = atoi(q);
+    else if (strcmp(p, "switch_idx") == 0)
+      switch_idx = atoi(q);
+    else if (strcmp(p, "pir_idx") == 0)
+      pir_idx = atoi(q);
 }
 
 #define PIR   13
@@ -70,6 +72,8 @@ void config::entry(const char *p, const char *q) {
 #define CMND_INTVL CMND INTVL
 #define CMND_LIGHT CMND LIGHT
 #define CMND_TIME CMND TIME
+#define TO_DOMOTICZ "domoticz/in"
+//#define FROM_DOMOTICZ "domoticz/out"
 
 static int samples[SAMPLES], pos, smoothed;
 static long total;
@@ -86,12 +90,20 @@ static void pub(const char *topic, int val) {
   mqtt_client.publish(topic, msg);
 }
 
+static void domoticz_pub(int idx, int val) {
+  char msg[64];
+  snprintf(msg, sizeof(msg), "{\"idx\":%d,\"nvalue\":%d,\"svalue\":\"\"}", idx, val);
+  mqtt_client.publish(TO_DOMOTICZ, msg);
+}
+
 static void power(bool onoff) {
   on = onoff;
   if (on)
     last_activity = millis();
   digitalWrite(POWER, on);
   pub(STAT_PWR, on);
+  if (cfg.switch_idx != -1)
+    domoticz_pub(cfg.switch_idx, onoff);
 }
 
 static int sampleLight() {
@@ -110,7 +122,9 @@ static int sampleLight() {
   if (now - last_sample > 1000 * cfg.interval_time) {
     last_sample = now;
     pub(STAT_LIGHT, smoothed);
+#ifdef DEBUG
     Serial.printf("light=%d %d\r\n", light, smoothed);
+#endif
   }
   return smoothed;
 }
@@ -125,19 +139,19 @@ static char *as_chars(char *buf, int n, byte *payload, int length) {
 
 static void set_interval_time(byte *payload, int length) {
   char buf[32];
-  cfg.interval_time = atol(as_chars(buf, sizeof(buf), payload, length));
+  cfg.configure("interval_time", as_chars(buf, sizeof(buf), payload, length));
   mqtt_client.publish(STAT_INTVL, buf);
 }
 
 static void set_threshold(byte *payload, int length) {
   char buf[32];
-  cfg.threshold = atoi(as_chars(buf, sizeof(buf), payload, length));
+  cfg.configure("threshold", as_chars(buf, sizeof(buf), payload, length));
   mqtt_client.publish(STAT_LIGHT, buf);
 }
 
 static void set_time(byte *payload, int length) {
   char buf[32];
-  cfg.inactive_time = atol(as_chars(buf, sizeof(buf), payload, length));
+  cfg.configure("inactive_time", as_chars(buf, sizeof(buf), payload, length));
   mqtt_client.publish(STAT_TIME, buf);
 }
 
@@ -212,9 +226,12 @@ void setup() {
   Serial.printf("Threshold: %d\r\n", cfg.threshold);
   Serial.printf("Interval time: %d\r\n", cfg.interval_time);
   Serial.printf("Inactive time: %d\r\n", cfg.inactive_time);
+  Serial.printf("Switch idx: %d\r\n", cfg.switch_idx);
+  Serial.printf("PIR idx: %d\r\n", cfg.pir_idx);
 
   mqtt_client.setServer(cfg.mqtt_server, 1883);
   mqtt_client.setCallback([](char *topic, byte *payload, unsigned int length) {
+#ifdef DEBUG
     Serial.print("Message arrived [");
     Serial.print(topic);
     Serial.print("] ");
@@ -222,6 +239,7 @@ void setup() {
       Serial.print((char)payload[i]);
     }
     Serial.println();
+#endif
     if (strcmp(topic, CMND_PWR) == 0) {
       power(*payload == '1');
       return;      
@@ -232,6 +250,15 @@ void setup() {
       set_threshold(payload, length);
     else if (strcmp(topic, CMND_TIME) == 0)
       set_time(payload, length);
+#ifdef FROM_DOMOTICZ
+    else if (strcmp(topic, FROM_DOMOTICZ) == 0) {
+      const size_t bufferSize = JSON_OBJECT_SIZE(14) + 230;
+      DynamicJsonBuffer buf(bufferSize);
+      JsonObject& root = buf.parseObject(payload);
+      if (root["idx"] == cfg.switch_idx)
+        power(root["nvalue"] == 1);
+    }
+#endif
     flash(125, 1);
   });
 
@@ -240,10 +267,17 @@ void setup() {
 }
 
 static void mqtt_connect() {
+#ifdef DEBUG
   Serial.print("Attempting MQTT connection...");
+#endif
   if (mqtt_client.connect(cfg.hostname)) {
+#ifdef DEBUG
     Serial.println("connected");
+#endif
     mqtt_client.subscribe(CMND_ALL);
+#ifdef FROM_DOMOTICZ
+    mqtt_client.subscribe(FROM_DOMOTICZ);
+#endif
   } else {
     Serial.print("failed, rc=");
     Serial.print(mqtt_client.state());
@@ -265,7 +299,12 @@ void loop() {
   if (last_pir != pir) {
     last_pir = pir;
     pub(STAT_PIR, pir);
+    if (cfg.pir_idx != -1)
+      domoticz_pub(cfg.pir_idx, pir);
+#ifdef DEBUG
     Serial.printf("%d pir=%d\r\n", now, pir);
+#endif
+
   }
   int light = sampleLight();
   if (!on && pir && light > cfg.threshold) {

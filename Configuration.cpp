@@ -15,7 +15,7 @@ bool Configuration::read_file(const char *filename) {
       break;
     if (*p != '#') {
       const char *q = strsep(&b, "\n");
-      entry(p, q);
+      configure(p, q);
     }
   }
   f.close();
