@@ -377,12 +377,11 @@ UsedLibrary="/home/steve/src/SparkFun-Eagle-Libraries/SparkFun-Capacitors.lbr"
 UsedLibrary="/home/steve/src/SparkFun-Eagle-Libraries/SparkFun-Boards.lbr"
 UsedLibrary="/home/steve/src/SparkFun-Eagle-Libraries/SparkFun-Batteries.lbr"
 UsedLibrary="/home/steve/src/SparkFun-Eagle-Libraries/SparkFun-Aesthetics.lbr"
-UsedLibrary="/home/steve/src/ikesato-eagle-libraries/lbr/senba-pir-sensor.lbr"
 UsedLibrary="/home/steve/src/diy-modules.lbr"
 
 [Win_1]
 Type="Control Panel"
-Loc="60 23 659 422"
+Loc="63 48 662 447"
 State=0
 Number=0
 

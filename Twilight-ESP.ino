@@ -52,6 +52,7 @@ void config::configure(const char *p, const char *q) {
 }
 
 #define PIR   4
+#define PIR_LED 2
 #define POWER 5
 #define HZ    4
 #define SAMPLES (15*HZ)
@@ -170,6 +171,7 @@ void setup() {
   
   pinMode(PIR, INPUT);
   pinMode(POWER, OUTPUT);
+  pinMode(PIR_LED, OUTPUT);
   flash(250, 1);
 
   bool result = SPIFFS.begin();
@@ -297,6 +299,7 @@ void loop() {
   long now = millis();
   int pir = digitalRead(PIR);
   if (last_pir != pir) {
+    digitalWrite(PIR_LED, !pir);
     last_pir = pir;
     pub(STAT_PIR, pir);
     if (cfg.pir_idx != -1)
@@ -304,7 +307,6 @@ void loop() {
 #ifdef DEBUG
     Serial.printf("%d pir=%d\r\n", now, pir);
 #endif
-
   }
   int light = sampleLight();
   if (!on && pir && light > cfg.threshold) {
