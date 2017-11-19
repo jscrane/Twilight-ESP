@@ -169,7 +169,7 @@ void setup() {
   if (*cfg.ssid) {
     WiFi.begin(cfg.ssid, cfg.password);
     for (int i = 0; i < 60 && WiFi.status() != WL_CONNECTED; i++) {
-      delay(500);
+      flash(250, 1);
       Serial.print(F("."));
     }
     connected = WiFi.status() == WL_CONNECTED;
@@ -181,7 +181,7 @@ void setup() {
       File f = SPIFFS.open("/config.json", "w");
       f.print(body);
       f.close();
-      // ESP.restart();
+      ESP.restart();
     } else
       server.send(400, "text/plain", "No body!");
   });
