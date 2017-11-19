@@ -14101,22 +14101,22 @@ You are welcome to use this library for commercial purposes. For attribution, we
 </plain>
 <instances>
 <instance part="WEMOS1" gate="D1" x="43.18" y="68.58"/>
-<instance part="R1" gate="G$1" x="20.32" y="71.12"/>
-<instance part="R2" gate="G$1" x="15.24" y="63.5" rot="R90"/>
+<instance part="R1" gate="G$1" x="25.4" y="93.98"/>
+<instance part="R2" gate="G$1" x="20.32" y="88.9" rot="R90"/>
 <instance part="R3" gate="G$1" x="-22.86" y="81.28" rot="R90"/>
-<instance part="Q1" gate="G$1" x="2.54" y="71.12" rot="MR0"/>
+<instance part="Q1" gate="G$1" x="7.62" y="96.52" rot="MR0"/>
 <instance part="R4" gate="G$1" x="-22.86" y="68.58" rot="R90"/>
 <instance part="GND3" gate="1" x="76.2" y="58.42"/>
-<instance part="GND5" gate="1" x="-2.54" y="58.42"/>
+<instance part="GND5" gate="1" x="2.54" y="83.82"/>
 <instance part="SUPPLY1" gate="G$1" x="-22.86" y="86.36"/>
 <instance part="SUPPLY2" gate="G$1" x="27.94" y="60.96" rot="R90"/>
 <instance part="SUPPLY3" gate="G$1" x="60.96" y="60.96" rot="R270"/>
-<instance part="J1" gate="J$1" x="91.44" y="66.04" rot="R180"/>
-<instance part="SUPPLY4" gate="G$1" x="76.2" y="71.12"/>
-<instance part="J2" gate="G$1" x="-10.16" y="83.82"/>
+<instance part="J1" gate="J$1" x="91.44" y="71.12" rot="R180"/>
+<instance part="SUPPLY4" gate="G$1" x="76.2" y="76.2"/>
+<instance part="J2" gate="G$1" x="-12.7" y="99.06"/>
 <instance part="GND2" gate="1" x="-22.86" y="58.42"/>
-<instance part="GND1" gate="1" x="15.24" y="55.88"/>
-<instance part="SUPPLY5" gate="G$1" x="-2.54" y="88.9"/>
+<instance part="GND1" gate="1" x="20.32" y="81.28"/>
+<instance part="SUPPLY5" gate="G$1" x="-2.54" y="101.6"/>
 <instance part="U1" gate="G$1" x="45.72" y="43.18"/>
 <instance part="SUPPLY6" gate="G$1" x="27.94" y="43.18"/>
 <instance part="GND4" gate="1" x="45.72" y="33.02"/>
@@ -14128,35 +14128,13 @@ You are welcome to use this library for commercial purposes. For attribution, we
 <instance part="J3" gate="G$1" x="-10.16" y="40.64"/>
 <instance part="SUPPLY8" gate="G$1" x="-2.54" y="45.72"/>
 <instance part="GND8" gate="1" x="-2.54" y="33.02"/>
-<instance part="R5" gate="G$1" x="68.58" y="76.2" rot="R90"/>
-<instance part="D1" gate="G$1" x="68.58" y="86.36"/>
-<instance part="SUPPLY9" gate="G$1" x="68.58" y="88.9"/>
+<instance part="R5" gate="G$1" x="68.58" y="86.36" rot="R90"/>
+<instance part="D1" gate="G$1" x="68.58" y="99.06"/>
+<instance part="SUPPLY9" gate="G$1" x="68.58" y="101.6"/>
 </instances>
 <busses>
 </busses>
 <nets>
-<net name="N$1" class="0">
-<segment>
-<pinref part="WEMOS1" gate="D1" pin="D5"/>
-<pinref part="R1" gate="G$1" pin="2"/>
-<wire x1="25.4" y1="71.12" x2="27.94" y2="71.12" width="0.1524" layer="91"/>
-</segment>
-</net>
-<net name="N$2" class="0">
-<segment>
-<pinref part="R1" gate="G$1" pin="1"/>
-<pinref part="R2" gate="G$1" pin="2"/>
-<pinref part="Q1" gate="G$1" pin="G"/>
-<junction x="7.62" y="68.58"/>
-<pinref part="Q1" gate="G$1" pin="G"/>
-<wire x1="7.62" y1="68.58" x2="15.24" y2="68.58" width="0.1524" layer="91"/>
-<junction x="15.24" y="68.58"/>
-<wire x1="15.24" y1="68.58" x2="15.24" y2="71.12" width="0.1524" layer="91"/>
-</segment>
-<segment>
-<wire x1="17.78" y1="60.96" x2="17.78" y2="63.5" width="0.1524" layer="91"/>
-</segment>
-</net>
 <net name="N$3" class="0">
 <segment>
 <pinref part="R4" gate="G$1" pin="P$2"/>
@@ -14173,20 +14151,21 @@ You are welcome to use this library for commercial purposes. For attribution, we
 <pinref part="GND3" gate="1" pin="GND"/>
 <wire x1="76.2" y1="63.5" x2="76.2" y2="60.96" width="0.1524" layer="91"/>
 <pinref part="J1" gate="J$1" pin="3"/>
-<wire x1="76.2" y1="63.5" x2="83.82" y2="63.5" width="0.1524" layer="91"/>
+<wire x1="76.2" y1="63.5" x2="76.2" y2="68.58" width="0.1524" layer="91"/>
+<wire x1="76.2" y1="68.58" x2="83.82" y2="68.58" width="0.1524" layer="91"/>
 <junction x="76.2" y="63.5"/>
 </segment>
 <segment>
 <pinref part="Q1" gate="G$1" pin="S"/>
 <pinref part="GND5" gate="1" pin="GND"/>
-<wire x1="-2.54" y1="68.58" x2="-2.54" y2="60.96" width="0.1524" layer="91"/>
-<junction x="-2.54" y="60.96"/>
+<wire x1="2.54" y1="93.98" x2="2.54" y2="86.36" width="0.1524" layer="91"/>
+<junction x="2.54" y="86.36"/>
 </segment>
 <segment>
 <pinref part="R2" gate="G$1" pin="1"/>
-<wire x1="15.24" y1="58.42" x2="15.24" y2="60.96" width="0.1524" layer="91"/>
+<wire x1="20.32" y1="83.82" x2="20.32" y2="86.36" width="0.1524" layer="91"/>
 <pinref part="GND1" gate="1" pin="GND"/>
-<junction x="15.24" y="58.42"/>
+<junction x="20.32" y="83.82"/>
 </segment>
 <segment>
 <pinref part="R4" gate="G$1" pin="P$1"/>
@@ -14218,8 +14197,8 @@ You are welcome to use this library for commercial purposes. For attribution, we
 <segment>
 <pinref part="J1" gate="J$1" pin="1"/>
 <pinref part="SUPPLY4" gate="G$1" pin="3.3V"/>
-<wire x1="76.2" y1="71.12" x2="76.2" y2="68.58" width="0.1524" layer="91"/>
-<wire x1="76.2" y1="68.58" x2="83.82" y2="68.58" width="0.1524" layer="91"/>
+<wire x1="76.2" y1="76.2" x2="76.2" y2="73.66" width="0.1524" layer="91"/>
+<wire x1="76.2" y1="73.66" x2="83.82" y2="73.66" width="0.1524" layer="91"/>
 </segment>
 <segment>
 <pinref part="WEMOS1" gate="D1" pin="3V3"/>
@@ -14244,27 +14223,19 @@ You are welcome to use this library for commercial purposes. For attribution, we
 <pinref part="SUPPLY3" gate="G$1" pin="5V"/>
 </segment>
 </net>
-<net name="N$4" class="0">
-<segment>
-<pinref part="WEMOS1" gate="D1" pin="D4"/>
-<pinref part="J1" gate="J$1" pin="2"/>
-<wire x1="60.96" y1="66.04" x2="83.82" y2="66.04" width="0.1524" layer="91"/>
-</segment>
-</net>
 <net name="N$5" class="0">
 <segment>
 <pinref part="J2" gate="G$1" pin="1"/>
 <pinref part="Q1" gate="G$1" pin="D"/>
-<wire x1="-2.54" y1="83.82" x2="-2.54" y2="73.66" width="0.1524" layer="91"/>
-<junction x="-2.54" y="83.82"/>
-<junction x="-2.54" y="73.66"/>
+<wire x1="-5.08" y1="99.06" x2="2.54" y2="99.06" width="0.1524" layer="91"/>
+<junction x="2.54" y="99.06"/>
 </segment>
 </net>
 <net name="12V" class="0">
 <segment>
 <pinref part="SUPPLY5" gate="G$1" pin="12V"/>
 <pinref part="J2" gate="G$1" pin="2"/>
-<wire x1="-2.54" y1="88.9" x2="-2.54" y2="86.36" width="0.1524" layer="91"/>
+<wire x1="-2.54" y1="101.6" x2="-5.08" y2="101.6" width="0.1524" layer="91"/>
 </segment>
 <segment>
 <pinref part="SUPPLY6" gate="G$1" pin="12V"/>
@@ -14279,17 +14250,46 @@ You are welcome to use this library for commercial purposes. For attribution, we
 <wire x1="-2.54" y1="45.72" x2="-2.54" y2="43.18" width="0.1524" layer="91"/>
 </segment>
 </net>
-<net name="N$6" class="0">
-<segment>
-<pinref part="WEMOS1" gate="D1" pin="D2"/>
-<pinref part="R5" gate="G$1" pin="1"/>
-<wire x1="60.96" y1="71.12" x2="68.58" y2="71.12" width="0.1524" layer="91"/>
-</segment>
-</net>
 <net name="N$7" class="0">
 <segment>
 <pinref part="R5" gate="G$1" pin="2"/>
 <pinref part="D1" gate="G$1" pin="C"/>
+<wire x1="68.58" y1="93.98" x2="68.58" y2="91.44" width="0.1524" layer="91"/>
+</segment>
+</net>
+<net name="N$4" class="0">
+<segment>
+<pinref part="WEMOS1" gate="D1" pin="D4"/>
+<wire x1="60.96" y1="66.04" x2="68.58" y2="66.04" width="0.1524" layer="91"/>
+<pinref part="R5" gate="G$1" pin="1"/>
+<wire x1="68.58" y1="66.04" x2="68.58" y2="81.28" width="0.1524" layer="91"/>
+</segment>
+</net>
+<net name="N$6" class="0">
+<segment>
+<pinref part="WEMOS1" gate="D1" pin="D2"/>
+<pinref part="J1" gate="J$1" pin="2"/>
+<wire x1="60.96" y1="71.12" x2="83.82" y2="71.12" width="0.1524" layer="91"/>
+</segment>
+</net>
+<net name="N$1" class="0">
+<segment>
+<pinref part="R1" gate="G$1" pin="2"/>
+<wire x1="30.48" y1="93.98" x2="63.5" y2="93.98" width="0.1524" layer="91"/>
+<wire x1="63.5" y1="93.98" x2="63.5" y2="73.66" width="0.1524" layer="91"/>
+<pinref part="WEMOS1" gate="D1" pin="D1"/>
+<wire x1="60.96" y1="73.66" x2="63.5" y2="73.66" width="0.1524" layer="91"/>
+</segment>
+</net>
+<net name="N$2" class="0">
+<segment>
+<pinref part="Q1" gate="G$1" pin="G"/>
+<pinref part="Q1" gate="G$1" pin="G"/>
+<pinref part="R1" gate="G$1" pin="1"/>
+<pinref part="R2" gate="G$1" pin="2"/>
+<wire x1="12.7" y1="93.98" x2="20.32" y2="93.98" width="0.1524" layer="91"/>
+<junction x="12.7" y="93.98"/>
+<junction x="20.32" y="93.98"/>
 </segment>
 </net>
 </nets>
