@@ -2,15 +2,19 @@
 #include <FS.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
-#include <ArduinoOTA.h>
+#include <ESP8266WebServer.h>
+#include <ESP8266HTTPUpdateServer.h>
 #include <PubSubClient.h>
+
 #include "Configuration.h"
 
+MDNSResponder mdns;
 WiFiClient wifiClient;
 PubSubClient mqtt_client(wifiClient);
-MDNSResponder mdns;
+ESP8266WebServer server(80);
+ESP8266HTTPUpdateServer httpUpdater;
 
-//#define DEBUG
+#define DEBUG
 #define INTERVAL_TIME   10
 #define INACTIVE_TIME   300
 #define THRESHOLD       750
@@ -27,28 +31,19 @@ public:
   int switch_idx = -1;
   int pir_idx = -1;
 
-  void configure(const char *key, const char *value);
+  void configure(JsonObject &o);
 } cfg;
 
-void config::configure(const char *p, const char *q) {
-    if (strcmp(p, "ssid") == 0)
-      strncpy(ssid, q, sizeof(ssid));
-    else if (strcmp(p, "password") == 0)
-      strncpy(password, q, sizeof(password));
-    else if (strcmp(p, "hostname") == 0)
-      strncpy(hostname, q, sizeof(hostname));
-    else if (strcmp(p, "mqtt_server") == 0)
-      strncpy(mqtt_server, q, sizeof(mqtt_server));
-    else if (strcmp(p, "interval_time") == 0)
-      interval_time = atoi(q);
-    else if (strcmp(p, "inactive_time") == 0)
-      inactive_time = atoi(q);
-    else if (strcmp(p, "threshold") == 0)
-      threshold = atoi(q);
-    else if (strcmp(p, "switch_idx") == 0)
-      switch_idx = atoi(q);
-    else if (strcmp(p, "pir_idx") == 0)
-      pir_idx = atoi(q);
+void config::configure(JsonObject &o) {
+  strncpy_null(ssid, o["ssid"], sizeof(ssid));
+  strncpy_null(password, o["password"], sizeof(password));
+  strncpy_null(hostname, o["hostname"], sizeof(hostname));
+  strncpy_null(mqtt_server, o["mqtt_server"], sizeof(mqtt_server));
+  interval_time = (int)o["interval_time"];
+  inactive_time = (int)o["inactive_time"];
+  threshold = (int)o["threshold"];
+  switch_idx = (int)o["switch_idx"];
+  pir_idx = (int)o["pir_idx"];
 }
 
 #define PIR   4
@@ -80,6 +75,7 @@ static int samples[SAMPLES], pos, smoothed;
 static long total;
 static bool on;
 static long last_activity;
+static bool connected;
 
 static void pub(const char *topic, bool val) {
   mqtt_client.publish(topic, val? "1": "0");
@@ -130,32 +126,6 @@ static int sampleLight() {
   return smoothed;
 }
 
-static char *as_chars(char *buf, int n, byte *payload, int length) {
-  int i;
-  for (i = 0; i < length && i < n; i++)
-    buf[i] = (char)payload[i];
-  buf[i == n? n-1: i] = 0;  
-  return buf;
-}
-
-static void set_interval_time(byte *payload, int length) {
-  char buf[32];
-  cfg.configure("interval_time", as_chars(buf, sizeof(buf), payload, length));
-  mqtt_client.publish(STAT_INTVL, buf);
-}
-
-static void set_threshold(byte *payload, int length) {
-  char buf[32];
-  cfg.configure("threshold", as_chars(buf, sizeof(buf), payload, length));
-  mqtt_client.publish(STAT_LIGHT, buf);
-}
-
-static void set_time(byte *payload, int length) {
-  char buf[32];
-  cfg.configure("inactive_time", as_chars(buf, sizeof(buf), payload, length));
-  mqtt_client.publish(STAT_TIME, buf);
-}
-
 static void flash(int ms, int n) {
   for (int i = 0; i < n; i++) {
     digitalWrite(POWER, !on);
@@ -181,47 +151,10 @@ void setup() {
     return;
   }
 
-  if (!cfg.read_file("/config.txt")) {
+  if (!cfg.read_file("/config.json")) {
     Serial.print(F("config!"));
     return;
   }
-
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(cfg.ssid, cfg.password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("");
-  Serial.print("Connected to ");
-  Serial.println(cfg.ssid);
-  
-  if (mdns.begin(cfg.hostname, WiFi.localIP()))
-    Serial.println("mDNS started");
-
-  ArduinoOTA.setHostname(cfg.hostname);
-  ArduinoOTA.onStart([]() {
-    Serial.println("Start");
-  });
-  ArduinoOTA.onEnd([]() {
-    Serial.println("\nEnd");
-  });
-  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
-  });
-  ArduinoOTA.onError([](ota_error_t error) {
-    Serial.printf("Error[%u]: ", error);
-    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
-    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
-    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
-    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
-    else if (error == OTA_END_ERROR) Serial.println("End Failed");
-  });
-  ArduinoOTA.begin();
-
-  Serial.println("Ready");
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
 
   Serial.printf("Hostname: %s\r\n", cfg.hostname);
   Serial.printf("MQTT Server: %s\r\n", cfg.mqtt_server);  
@@ -231,63 +164,113 @@ void setup() {
   Serial.printf("Switch idx: %d\r\n", cfg.switch_idx);
   Serial.printf("PIR idx: %d\r\n", cfg.pir_idx);
 
-  mqtt_client.setServer(cfg.mqtt_server, 1883);
-  mqtt_client.setCallback([](char *topic, byte *payload, unsigned int length) {
-#ifdef DEBUG
-    Serial.print("Message arrived [");
-    Serial.print(topic);
-    Serial.print("] ");
-    for (int i=0; i < length; i++) {
-      Serial.print((char)payload[i]);
+  WiFi.mode(WIFI_STA);
+  WiFi.hostname(cfg.hostname);
+  if (*cfg.ssid) {
+    WiFi.begin(cfg.ssid, cfg.password);
+    for (int i = 0; i < 60 && WiFi.status() != WL_CONNECTED; i++) {
+      delay(500);
+      Serial.print(F("."));
     }
-    Serial.println();
-#endif
-    if (strcmp(topic, CMND_PWR) == 0) {
-      power(*payload == '1');
-      return;      
-    }
-    if (strcmp(topic, CMND_INTVL) == 0)
-      set_interval_time(payload, length);
-    else if (strcmp(topic, CMND_LIGHT) == 0)
-      set_threshold(payload, length);
-    else if (strcmp(topic, CMND_TIME) == 0)
-      set_time(payload, length);
-#ifdef FROM_DOMOTICZ
-    else if (strcmp(topic, FROM_DOMOTICZ) == 0) {
-      const size_t bufferSize = JSON_OBJECT_SIZE(14) + 230;
-      DynamicJsonBuffer buf(bufferSize);
-      JsonObject& root = buf.parseObject(payload);
-      if (root["idx"] == cfg.switch_idx)
-        power(root["nvalue"] == 1);
-    }
-#endif
-    flash(125, 1);
-  });
+    connected = WiFi.status() == WL_CONNECTED;
+  }
 
-  flash(250, 2);
-  power(false);
+  server.on("/config", HTTP_POST, []() {
+    if (server.hasArg("plain")) {
+      String body = server.arg("plain");
+      File f = SPIFFS.open("/config.json", "w");
+      f.print(body);
+      f.close();
+      // ESP.restart();
+    } else
+      server.send(400, "text/plain", "No body!");
+  });
+  server.serveStatic("/", SPIFFS, "/index.html");
+  server.serveStatic("/config", SPIFFS, "/config.json");
+  server.serveStatic("/js/transparency.min.js", SPIFFS, "/transparency.min.js");
+
+  httpUpdater.setup(&server);
+  server.begin();
+
+  if (!connected) {
+    WiFi.softAP(cfg.hostname);
+    Serial.print(F("Connect to SSID: "));
+    Serial.print(cfg.hostname);
+    Serial.println(F(" and URL http://192.168.4.1 to configure WIFI"));
+    flash(1000, 2);
+    power(false);
+      
+  } else {
+    Serial.println();
+    Serial.print(F("Connected to "));
+    Serial.println(cfg.ssid);
+    Serial.println(WiFi.localIP());
+  
+    if (mdns.begin(cfg.hostname, WiFi.localIP())) {
+      Serial.println(F("mDNS started"));
+      mdns.addService("http", "tcp", 80);
+    } else
+      Serial.println(F("Error starting MDNS"));
+
+    mqtt_client.setServer(cfg.mqtt_server, 1883);
+    mqtt_client.setCallback([](char *topic, byte *payload, unsigned int length) {
+#ifdef DEBUG
+      Serial.print("Message arrived [");
+      Serial.print(topic);
+      Serial.print("] ");
+      for (int i=0; i < length; i++) {
+        Serial.print((char)payload[i]);
+      }
+      Serial.println();
+#endif
+      if (strcmp(topic, CMND_PWR) == 0) {
+        power(*payload == '1');
+        return;      
+      }
+#ifdef FROM_DOMOTICZ
+      else if (strcmp(topic, FROM_DOMOTICZ) == 0) {
+        const size_t bufferSize = JSON_OBJECT_SIZE(14) + 230;
+        DynamicJsonBuffer buf(bufferSize);
+        JsonObject& root = buf.parseObject(payload);
+        if (root["idx"] == cfg.switch_idx)
+          power(root["nvalue"] == 1);
+      }
+#endif
+      flash(125, 1);
+    });
+
+    flash(250, 2);
+    power(false);
+  }
 }
 
 static void mqtt_connect() {
 #ifdef DEBUG
-  Serial.print("Attempting MQTT connection...");
+  Serial.print("Attempting MQTT connection to: ");
+  Serial.print(cfg.mqtt_server);
 #endif
   if (mqtt_client.connect(cfg.hostname)) {
 #ifdef DEBUG
-    Serial.println("connected");
+    Serial.println(" connected");
 #endif
     mqtt_client.subscribe(CMND_ALL);
 #ifdef FROM_DOMOTICZ
     mqtt_client.subscribe(FROM_DOMOTICZ);
 #endif
   } else {
-    Serial.print("failed, rc=");
+    Serial.print(" failed, rc=");
     Serial.print(mqtt_client.state());
   }
 }
 
 void loop() {
   static int last_pir;
+
+  server.handleClient();
+  if (!connected)
+    return;
+
+  mdns.update();
   
   if (!mqtt_client.connected())
     mqtt_connect();
@@ -295,7 +278,6 @@ void loop() {
   if (mqtt_client.connected())
     mqtt_client.loop();
     
-  ArduinoOTA.handle();
   long now = millis();
   int pir = digitalRead(PIR);
   if (last_pir != pir) {

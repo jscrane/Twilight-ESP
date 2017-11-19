@@ -5,8 +5,10 @@ class Configuration {
 public:
   bool read_file(const char *filename);
 
-  virtual bool value(const char *key, char *value, int n) { return false; }
-  virtual void configure(const char *key, const char *value) = 0;
+protected:
+  virtual void configure(class JsonObject &root) = 0;
+
+  static void strncpy_null(char *dest, const char *src, int n);
 };
 
 #endif
