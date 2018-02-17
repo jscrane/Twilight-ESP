@@ -7,19 +7,13 @@ bool Configuration::read_file(const char *filename) {
   if (!f)
     return false;
 
-  char buf[512];
-  f.readBytes(buf, sizeof(buf));
   DynamicJsonBuffer json(JSON_OBJECT_SIZE(11) + 210);
-  JsonObject &root = json.parseObject(buf);
-  configure(root);
+  JsonObject &root = json.parseObject(f);
   f.close();
-  return true;
-}
+  if (!root.success())
+    return false;
 
-void Configuration::strncpy_null(char *dest, const char *src, int n) {
-  if (src)
-    strncpy(dest, src, n);
-  else
-    *dest = 0;
+  configure(root);
+  return true;
 }
 

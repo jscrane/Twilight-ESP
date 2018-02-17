@@ -35,15 +35,15 @@ public:
 } cfg;
 
 void config::configure(JsonObject &o) {
-  strncpy_null(ssid, o["ssid"], sizeof(ssid));
-  strncpy_null(password, o["password"], sizeof(password));
-  strncpy_null(hostname, o["hostname"], sizeof(hostname));
-  strncpy_null(mqtt_server, o["mqtt_server"], sizeof(mqtt_server));
-  interval_time = (int)o["interval_time"];
-  inactive_time = (int)o["inactive_time"];
-  threshold = (int)o["threshold"];
-  switch_idx = (int)o["switch_idx"];
-  pir_idx = (int)o["pir_idx"];
+  strncpy(ssid, o[F("ssid")] | "", sizeof(ssid));
+  strncpy(password, o[F("password")] | "", sizeof(password));
+  strncpy(hostname, o[F("hostname")] | "", sizeof(hostname));
+  strncpy(mqtt_server, o[F("mqtt_server")] | "", sizeof(mqtt_server));
+  interval_time = (int)o[F("interval_time")];
+  inactive_time = (int)o[F("inactive_time")];
+  threshold = (int)o[F("threshold")];
+  switch_idx = (int)o[F("switch_idx")];
+  pir_idx = (int)o[F("pir_idx")];
 }
 
 #define PIR   4
@@ -137,7 +137,7 @@ static void flash(int ms, int n) {
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("Booting!");
+  Serial.println(F("Booting!"));
   
   pinMode(PIR, INPUT);
   pinMode(POWER, OUTPUT);
@@ -146,7 +146,7 @@ void setup() {
 
   bool result = SPIFFS.begin();
   if (!result) {
-    Serial.print("SPIFFS: ");
+    Serial.print(F("SPIFFS: "));
     Serial.println(result);
     return;
   }
@@ -156,13 +156,20 @@ void setup() {
     return;
   }
 
-  Serial.printf("Hostname: %s\r\n", cfg.hostname);
-  Serial.printf("MQTT Server: %s\r\n", cfg.mqtt_server);  
-  Serial.printf("Threshold: %d\r\n", cfg.threshold);
-  Serial.printf("Interval time: %d\r\n", cfg.interval_time);
-  Serial.printf("Inactive time: %d\r\n", cfg.inactive_time);
-  Serial.printf("Switch idx: %d\r\n", cfg.switch_idx);
-  Serial.printf("PIR idx: %d\r\n", cfg.pir_idx);
+  Serial.print(F("Hostname: "));
+  Serial.println(cfg.hostname);
+  Serial.print(F("MQTT Server: "));
+  Serial.println(cfg.mqtt_server);
+  Serial.print(F("Threshold: "));
+  Serial.println(cfg.threshold);
+  Serial.print(F("Interval time: "));
+  Serial.println(cfg.interval_time);
+  Serial.print(F("Inactive time: "));
+  Serial.println(cfg.inactive_time);
+  Serial.print(F("Switch idx: %d\r\n"));
+  Serial.println(cfg.switch_idx);
+  Serial.print(F("PIR idx: "));
+  Serial.println(cfg.pir_idx);
 
   WiFi.mode(WIFI_STA);
   WiFi.hostname(cfg.hostname);
@@ -170,7 +177,7 @@ void setup() {
     WiFi.begin(cfg.ssid, cfg.password);
     for (int i = 0; i < 60 && WiFi.status() != WL_CONNECTED; i++) {
       flash(250, 1);
-      Serial.print(F("."));
+      Serial.print('.');
     }
     connected = WiFi.status() == WL_CONNECTED;
   }
@@ -215,9 +222,9 @@ void setup() {
     mqtt_client.setServer(cfg.mqtt_server, 1883);
     mqtt_client.setCallback([](char *topic, byte *payload, unsigned int length) {
 #ifdef DEBUG
-      Serial.print("Message arrived [");
+      Serial.print(F("Message arrived ["));
       Serial.print(topic);
-      Serial.print("] ");
+      Serial.print(F("] "));
       for (int i=0; i < length; i++) {
         Serial.print((char)payload[i]);
       }
@@ -246,19 +253,19 @@ void setup() {
 
 static void mqtt_connect() {
 #ifdef DEBUG
-  Serial.print("Attempting MQTT connection to: ");
+  Serial.print(F("Attempting MQTT connection to: "));
   Serial.print(cfg.mqtt_server);
 #endif
   if (mqtt_client.connect(cfg.hostname)) {
 #ifdef DEBUG
-    Serial.println(" connected");
+    Serial.println(F(" connected"));
 #endif
     mqtt_client.subscribe(CMND_ALL);
 #ifdef FROM_DOMOTICZ
     mqtt_client.subscribe(FROM_DOMOTICZ);
 #endif
   } else {
-    Serial.print(" failed, rc=");
+    Serial.print(F(" failed, rc="));
     Serial.print(mqtt_client.state());
   }
 }
