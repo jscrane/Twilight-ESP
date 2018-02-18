@@ -46,9 +46,9 @@ void config::configure(JsonObject &o) {
   pir_idx = (int)o[F("pir_idx")];
 }
 
-#define PIR   4
-#define PIR_LED 2
-#define POWER 5
+#define PIR   D2
+#define PIR_LED D4
+#define POWER D5
 #define HZ    4
 #define SAMPLES (15*HZ)
 
@@ -142,7 +142,7 @@ void setup() {
   pinMode(PIR, INPUT);
   pinMode(POWER, OUTPUT);
   pinMode(PIR_LED, OUTPUT);
-  flash(250, 1);
+  flash(500, 2);
 
   bool result = SPIFFS.begin();
   if (!result) {
@@ -166,7 +166,7 @@ void setup() {
   Serial.println(cfg.interval_time);
   Serial.print(F("Inactive time: "));
   Serial.println(cfg.inactive_time);
-  Serial.print(F("Switch idx: %d\r\n"));
+  Serial.print(F("Switch idx: "));
   Serial.println(cfg.switch_idx);
   Serial.print(F("PIR idx: "));
   Serial.println(cfg.pir_idx);
