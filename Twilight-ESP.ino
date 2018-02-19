@@ -39,8 +39,8 @@ void config::configure(JsonObject &o) {
   strncpy(password, o[F("password")] | "", sizeof(password));
   strncpy(hostname, o[F("hostname")] | "", sizeof(hostname));
   strncpy(mqtt_server, o[F("mqtt_server")] | "", sizeof(mqtt_server));
-  interval_time = (int)o[F("interval_time")];
-  inactive_time = (int)o[F("inactive_time")];
+  interval_time = 1000 * (long)o[F("interval_time")];
+  inactive_time = 1000 * (long)o[F("inactive_time")];
   threshold = (int)o[F("threshold")];
   switch_idx = (int)o[F("switch_idx")];
   pir_idx = (int)o[F("pir_idx")];
@@ -77,10 +77,6 @@ static bool on;
 static long last_activity;
 static bool connected;
 
-static void pub(const char *topic, bool val) {
-  mqtt_client.publish(topic, val? "1": "0");
-}
-
 static void pub(const char *topic, int val) {
   char msg[16];
   snprintf(msg, sizeof(msg), "%d", val);
@@ -95,12 +91,23 @@ static void domoticz_pub(int idx, int val) {
 
 static void power(bool onoff) {
   on = onoff;
-  if (on)
+#ifdef DEBUG
+  Serial.printf("power: %d\n", on);
+#endif
+  if (on) {
     last_activity = millis();
-  digitalWrite(POWER, on);
+    for (int i = 0; i <= PWMRANGE; i++) {
+      analogWrite(POWER, i);
+      delay(10);
+    }
+  } else
+    for (int i = PWMRANGE; i >= 0; i--) {
+      analogWrite(POWER, i);
+      delay(10);
+    }
   pub(STAT_PWR, on);
   if (cfg.switch_idx != -1)
-    domoticz_pub(cfg.switch_idx, onoff);
+    domoticz_pub(cfg.switch_idx, on);
 }
 
 static int sampleLight() {
@@ -116,7 +123,7 @@ static int sampleLight() {
   smoothed = (int)(total / n);
   
   long now = millis();
-  if (now - last_sample > 1000 * cfg.interval_time) {
+  if (now - last_sample > cfg.interval_time) {
     last_sample = now;
     pub(STAT_LIGHT, smoothed);
 #ifdef DEBUG
@@ -179,6 +186,7 @@ void setup() {
       flash(250, 1);
       Serial.print('.');
     }
+    Serial.println();
     connected = WiFi.status() == WL_CONNECTED;
   }
 
@@ -204,11 +212,9 @@ void setup() {
     Serial.print(F("Connect to SSID: "));
     Serial.print(cfg.hostname);
     Serial.println(F(" and URL http://192.168.4.1 to configure WIFI"));
-    flash(1000, 2);
-    power(false);
-      
+    for (;;)
+      flash(2000, 1);
   } else {
-    Serial.println();
     Serial.print(F("Connected to "));
     Serial.println(cfg.ssid);
     Serial.println(WiFi.localIP());
@@ -298,15 +304,13 @@ void loop() {
 #endif
   }
   int light = sampleLight();
-  if (!on && pir && light > cfg.threshold) {
-    on = true;
-    power(on);
-  }
+  if (!on && pir && light > cfg.threshold)
+    power(true);
+
   if (pir)
     last_activity = now;
-  if (on && (now - last_activity) > 1000 * cfg.inactive_time) {
-    on = false;
-    power(on);
-  }
+  if (on && (now - last_activity) > cfg.inactive_time)
+    power(false);
+
   delay(1000 / HZ);
 }
