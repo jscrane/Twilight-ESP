@@ -73,7 +73,7 @@ void config::configure(JsonObject &o) {
 #define CMND_LIGHT CMND LIGHT
 #define CMND_TIME CMND TIME
 #define TO_DOMOTICZ "domoticz/in"
-//#define FROM_DOMOTICZ "domoticz/out"
+#define FROM_DOMOTICZ "domoticz/out"
 
 static int samples[SAMPLES], pos, smoothed;
 static long total;
@@ -88,12 +88,16 @@ static void pub(const char *topic, int val) {
 }
 
 static void domoticz_pub(int idx, int val) {
-  char msg[64];
-  snprintf(msg, sizeof(msg), "{\"idx\":%d,\"nvalue\":%d,\"svalue\":\"\"}", idx, val);
-  mqtt_client.publish(TO_DOMOTICZ, msg);
+  if (idx != -1) {
+    char msg[64];
+    snprintf(msg, sizeof(msg), "{\"idx\":%d,\"nvalue\":%d,\"svalue\":\"\"}", idx, val);
+    mqtt_client.publish(TO_DOMOTICZ, msg);
+  }
 }
 
-static void power(bool onoff) {
+static bool power(bool onoff) {
+  if (on == onoff)
+    return false;
   on = onoff;
 #ifdef DEBUG
   Serial.printf("power: %d\n", on);
@@ -109,9 +113,7 @@ static void power(bool onoff) {
       analogWrite(POWER, i);
       delay(cfg.off_delay);
     }
-  pub(STAT_PWR, on);
-  if (cfg.switch_idx != -1)
-    domoticz_pub(cfg.switch_idx, on);
+  return true;
 }
 
 static int sampleLight() {
@@ -244,20 +246,21 @@ void setup() {
       }
       Serial.println();
 #endif
-      if (strcmp(topic, CMND_PWR) == 0) {
-        power(*payload == '1');
-        return;      
+      if (strcmp(topic, CMND_PWR) == 0 && power(*payload == '1')) {
+        pub(STAT_PWR, on);
+        domoticz_pub(cfg.switch_idx, on);
+        return;
       }
 #ifdef FROM_DOMOTICZ
-      else if (strcmp(topic, FROM_DOMOTICZ) == 0) {
-        const size_t bufferSize = JSON_OBJECT_SIZE(14) + 230;
-        DynamicJsonBuffer buf(bufferSize);
+      if (strcmp(topic, FROM_DOMOTICZ) == 0) {
+        DynamicJsonBuffer buf(JSON_OBJECT_SIZE(14) + 230);
         JsonObject& root = buf.parseObject(payload);
-        if (root["idx"] == cfg.switch_idx)
-          power(root["nvalue"] == 1);
+        if (root["idx"] == cfg.switch_idx && power(root["nvalue"] == 1)) {
+          pub(STAT_PWR, on);
+          return;
+        }
       }
 #endif
-      flash(125, 1);
     });
 
     flash(250, 2);
@@ -306,20 +309,22 @@ void loop() {
     digitalWrite(PIR_LED, !pir);
     last_pir = pir;
     pub(STAT_PIR, pir);
-    if (cfg.pir_idx != -1)
-      domoticz_pub(cfg.pir_idx, pir);
+    domoticz_pub(cfg.pir_idx, pir);
 #ifdef DEBUG
     Serial.printf("%d pir=%d\r\n", now, pir);
 #endif
   }
   int light = sampleLight();
-  if (!on && pir && light > cfg.threshold)
-    power(true);
-
-  if (pir)
+  if (pir) {
     last_activity = now;
-  if (on && (now - last_activity) > cfg.inactive_time)
-    power(false);
+    if (light > cfg.threshold && power(true)) {
+      pub(STAT_PWR, on);
+      domoticz_pub(cfg.switch_idx, on);
+    }
+  } else if ((now - last_activity) > cfg.inactive_time && power(false)) {
+    pub(STAT_PWR, on);
+    domoticz_pub(cfg.switch_idx, on);
+  }
 
   delay(1000 / HZ);
 }
