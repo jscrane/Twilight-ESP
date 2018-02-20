@@ -153,6 +153,8 @@ void setup() {
   pinMode(PIR, INPUT);
   pinMode(POWER, OUTPUT);
   pinMode(PIR_LED, OUTPUT);
+
+  digitalWrite(POWER, LOW);
   flash(500, 2);
 
   bool result = SPIFFS.begin();
@@ -190,7 +192,7 @@ void setup() {
   WiFi.hostname(cfg.hostname);
   if (*cfg.ssid) {
     WiFi.begin(cfg.ssid, cfg.password);
-    for (int i = 0; i < 60 && WiFi.status() != WL_CONNECTED; i++) {
+    for (int i = 0; i < 120 && WiFi.status() != WL_CONNECTED; i++) {
       flash(250, 1);
       Serial.print('.');
     }
@@ -215,24 +217,22 @@ void setup() {
   httpUpdater.setup(&server);
   server.begin();
 
+  if (mdns.begin(cfg.hostname, WiFi.localIP())) {
+    Serial.println(F("mDNS started"));
+    mdns.addService("http", "tcp", 80);
+  } else
+    Serial.println(F("Error starting MDNS"));
+
   if (!connected) {
     WiFi.softAP(cfg.hostname);
     Serial.print(F("Connect to SSID: "));
     Serial.print(cfg.hostname);
     Serial.println(F(" and URL http://192.168.4.1 to configure WIFI"));
-    for (;;)
-      flash(2000, 1);
   } else {
     Serial.print(F("Connected to "));
     Serial.println(cfg.ssid);
     Serial.println(WiFi.localIP());
   
-    if (mdns.begin(cfg.hostname, WiFi.localIP())) {
-      Serial.println(F("mDNS started"));
-      mdns.addService("http", "tcp", 80);
-    } else
-      Serial.println(F("Error starting MDNS"));
-
     mqtt_client.setServer(cfg.mqtt_server, 1883);
     mqtt_client.setCallback([](char *topic, byte *payload, unsigned int length) {
 #ifdef DEBUG
@@ -261,7 +261,6 @@ void setup() {
     });
 
     flash(250, 2);
-    power(false);
   }
 }
 
@@ -285,13 +284,14 @@ static void mqtt_connect() {
 }
 
 void loop() {
-  static int last_pir;
-
-  server.handleClient();
-  if (!connected)
-    return;
 
   mdns.update();
+  server.handleClient();
+
+  if (!connected) {
+    flash(1000, 1);
+    return;
+  }
   
   if (!mqtt_client.connected())
     mqtt_connect();
@@ -299,6 +299,7 @@ void loop() {
   if (mqtt_client.connected())
     mqtt_client.loop();
     
+  static int last_pir;
   long now = millis();
   int pir = digitalRead(PIR);
   if (last_pir != pir) {
