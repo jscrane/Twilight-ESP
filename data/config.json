@@ -7,5 +7,7 @@
  "inactive_time": 300,
  "threshold": 750,
  "switch_idx": 22,
- "pir_idx": 23
+ "pir_idx": 23,
+ "on_delay": 2,
+ "off_delay": 10
 }

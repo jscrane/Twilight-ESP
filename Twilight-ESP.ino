@@ -30,6 +30,8 @@ public:
   int threshold = THRESHOLD;
   int switch_idx = -1;
   int pir_idx = -1;
+  int on_delay = 0;
+  int off_delay = 0;
 
   void configure(JsonObject &o);
 } cfg;
@@ -44,6 +46,8 @@ void config::configure(JsonObject &o) {
   threshold = (int)o[F("threshold")];
   switch_idx = (int)o[F("switch_idx")];
   pir_idx = (int)o[F("pir_idx")];
+  on_delay = (int)o[F("on_delay")];
+  off_delay = (int)o[F("off_delay")];
 }
 
 #define PIR   D2
@@ -98,12 +102,12 @@ static void power(bool onoff) {
     last_activity = millis();
     for (int i = 0; i <= PWMRANGE; i++) {
       analogWrite(POWER, i);
-      delay(10);
+      delay(cfg.on_delay);
     }
   } else
     for (int i = PWMRANGE; i >= 0; i--) {
       analogWrite(POWER, i);
-      delay(10);
+      delay(cfg.off_delay);
     }
   pub(STAT_PWR, on);
   if (cfg.switch_idx != -1)
@@ -177,6 +181,10 @@ void setup() {
   Serial.println(cfg.switch_idx);
   Serial.print(F("PIR idx: "));
   Serial.println(cfg.pir_idx);
+  Serial.print(F("On delay: "));
+  Serial.println(cfg.on_delay);
+  Serial.print(F("Off delay: "));
+  Serial.println(cfg.off_delay);
 
   WiFi.mode(WIFI_STA);
   WiFi.hostname(cfg.hostname);
