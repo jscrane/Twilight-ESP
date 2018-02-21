@@ -111,6 +111,8 @@ static bool power(bool onoff) {
   } else
     for (int i = PWMRANGE; i >= 0; i--) {
       analogWrite(POWER, i);
+      if (digitalRead(PIR))
+        return false;
       delay(cfg.off_delay);
     }
   return true;
@@ -237,15 +239,6 @@ void setup() {
   
     mqtt_client.setServer(cfg.mqtt_server, 1883);
     mqtt_client.setCallback([](char *topic, byte *payload, unsigned int length) {
-#ifdef DEBUG
-      Serial.print(F("Message arrived ["));
-      Serial.print(topic);
-      Serial.print(F("] "));
-      for (int i=0; i < length; i++) {
-        Serial.print((char)payload[i]);
-      }
-      Serial.println();
-#endif
       if (strcmp(topic, CMND_PWR) == 0 && power(*payload == '1')) {
         pub(STAT_PWR, on);
         domoticz_pub(cfg.switch_idx, on);
