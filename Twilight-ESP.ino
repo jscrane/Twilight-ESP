@@ -14,7 +14,6 @@ PubSubClient mqtt_client(wifiClient);
 ESP8266WebServer server(80);
 ESP8266HTTPUpdateServer httpUpdater;
 
-#define DEBUG
 #define INTERVAL_TIME   10
 #define INACTIVE_TIME   300
 #define THRESHOLD       750
@@ -128,9 +127,6 @@ static int sampleLight() {
   if (now - last_sample > cfg.interval_time) {
     last_sample = now;
     pub(STAT_LIGHT, smoothed);
-#ifdef DEBUG
-    Serial.printf("light=%d %d\r\n", light, smoothed);
-#endif
   }
   return smoothed;
 }
@@ -242,7 +238,6 @@ void setup() {
           state = TURNING_OFF;
         return;
       }
-#ifdef FROM_DOMOTICZ
       if (strcmp(topic, FROM_DOMOTICZ) == 0) {
         DynamicJsonBuffer buf(JSON_OBJECT_SIZE(14) + 230);
         JsonObject& root = buf.parseObject(payload);
@@ -255,7 +250,6 @@ void setup() {
           return;
         }
       }
-#endif
     });
 
     flash(250, 2);
@@ -263,26 +257,18 @@ void setup() {
 }
 
 static void mqtt_connect() {
-#ifdef DEBUG
-  Serial.print(F("Attempting MQTT connection to: "));
-  Serial.print(cfg.mqtt_server);
-#endif
   if (mqtt_client.connect(cfg.hostname)) {
-#ifdef DEBUG
-    Serial.println(F(" connected"));
-#endif
     mqtt_client.subscribe(CMND_ALL);
-#ifdef FROM_DOMOTICZ
     mqtt_client.subscribe(FROM_DOMOTICZ);
-#endif
   } else {
+    Serial.print(F("MQTT connection to: "));
+    Serial.print(cfg.mqtt_server);
     Serial.print(F(" failed, rc="));
     Serial.print(mqtt_client.state());
   }
 }
 
 void loop() {
-
   mdns.update();
   server.handleClient();
 
@@ -306,9 +292,6 @@ void loop() {
     last_pir = pir;
     pub(STAT_PIR, pir);
     domoticz_pub(cfg.pir_idx, pir);
-#ifdef DEBUG
-    Serial.printf("%d pir=%d\r\n", now, pir);
-#endif
   }
   int light = sampleLight();
   if (pir) {
