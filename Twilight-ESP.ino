@@ -51,7 +51,7 @@ void config::configure(JsonObject &o) {
 
 #define PIR   D2
 #define PIR_LED D4
-#define POWER D5
+#define POWER D1
 #define HZ    4
 #define SAMPLES (15*HZ)
 
