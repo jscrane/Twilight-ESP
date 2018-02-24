@@ -86,6 +86,14 @@ function save_config() {
     <td><input type="number" min="0" id="off_delay"></td>
   </tr>
   <tr>
+    <td>On brightness:</td>
+    <td><input type="number" min="0" max=1023 id="on_bright"></td>
+  </tr>
+  <tr>
+    <td>Off brightness:</td>
+    <td><input type="number" min="0" max=1023 id="off_bright"></td>
+  </tr>
+  <tr>
     <td colspan="2" align="center">
       <button type="submit" onclick="save_config()">Update</button>
     </td>

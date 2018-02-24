@@ -7,7 +7,7 @@ bool Configuration::read_file(const char *filename) {
   if (!f)
     return false;
 
-  DynamicJsonBuffer json(JSON_OBJECT_SIZE(11) + 210);
+  DynamicJsonBuffer json(JSON_OBJECT_SIZE(13) + 230);
   JsonObject &root = json.parseObject(f);
   f.close();
   if (!root.success())
