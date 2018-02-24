@@ -77,19 +77,21 @@ void config::configure(JsonObject &o) {
 enum State {
   OFF = 0,
   ON,
-  TURNING_OFF,
-  TURNING_ON,
+  AUTO_OFF,
+  AUTO_ON,
+  MQTT_OFF,
+  MQTT_ON,
   DOMOTICZ_OFF,
   DOMOTICZ_ON
 };
 static State state;
 
 inline bool isOff() {
-  return state == OFF || state == TURNING_OFF || state == DOMOTICZ_OFF;
+  return state == OFF || state == AUTO_OFF || state == MQTT_OFF || state == DOMOTICZ_OFF;
 }
 
 inline bool isOn() {
-  return state == ON || state == TURNING_ON || state == DOMOTICZ_ON;
+  return state == ON || state == AUTO_ON || state == MQTT_ON || state == DOMOTICZ_ON;
 }
 
 static long last_activity;
@@ -231,23 +233,20 @@ void setup() {
     mqtt_client.setServer(cfg.mqtt_server, 1883);
     mqtt_client.setCallback([](char *topic, byte *payload, unsigned int length) {
       if (strcmp(topic, CMND_PWR) == 0) {
-        if (*payload == '1') {
-          if (isOff())
-            state = TURNING_ON;
-        } else if (isOn())
-          state = TURNING_OFF;
-        return;
-      }
-      if (strcmp(topic, FROM_DOMOTICZ) == 0) {
+        bool cmdOn = *payload == '1';
+        if (cmdOn && isOff())
+          state = MQTT_ON;
+        else if (isOn())
+          state = MQTT_OFF;
+      } else if (strcmp(topic, FROM_DOMOTICZ) == 0) {
         DynamicJsonBuffer buf(JSON_OBJECT_SIZE(14) + 230);
         JsonObject& root = buf.parseObject(payload);
         if (root[F("idx")] == cfg.switch_idx) {
-          if (root[F("nvalue")] == 1) {
-            if (isOff())
-              state = DOMOTICZ_ON;
-          } else if (isOn())
+          bool cmdOn = root[F("nvalue")] == 1;
+          if (cmdOn && isOff())
+            state = DOMOTICZ_ON;
+          else if (isOn())
             state = DOMOTICZ_OFF;
-          return;
         }
       }
     });
@@ -286,52 +285,54 @@ void loop() {
   static int last_pir;
   static int fade;
   long now = millis();
+  int light = sampleLight();
   int pir = digitalRead(PIR);
   if (last_pir != pir) {
     digitalWrite(PIR_LED, !pir);
     last_pir = pir;
     pub(STAT_PIR, pir);
     domoticz_pub(cfg.pir_idx, pir);
-  }
-  int light = sampleLight();
-  if (pir) {
-    last_activity = now;
-    if (light > cfg.threshold && isOff())
-      state = TURNING_ON;
+    if (pir) {
+      last_activity = now;
+      if (light > cfg.threshold && isOff())
+        state = AUTO_ON;
+    }
   }
   unsigned d = 1000 / HZ;
   switch (state) {
   case OFF:
     break;
-  case TURNING_OFF:
+  case AUTO_OFF:
+  case MQTT_OFF:
   case DOMOTICZ_OFF:
     if (fade == 0) {
       pub(STAT_PWR, false);
-      if (state == TURNING_OFF)
+      if (state != DOMOTICZ_OFF)
         domoticz_pub(cfg.switch_idx, false);
       state = OFF;
-      break;
+    } else {
+      fade--;
+      analogWrite(POWER, fade);
+      d = cfg.off_delay;
     }
-    fade--;
-    analogWrite(POWER, fade);
-    d = cfg.off_delay;
     break;
   case ON:
     if ((now - last_activity) > cfg.inactive_time)
-      state = TURNING_OFF;
+      state = AUTO_OFF;
     break;
-  case TURNING_ON:
+  case AUTO_ON:
+  case MQTT_ON:
   case DOMOTICZ_ON:
     if (fade == PWMRANGE) {
       pub(STAT_PWR, true);
-      if (state == TURNING_ON)
+      if (state != DOMOTICZ_ON)
         domoticz_pub(cfg.switch_idx, true);
       state = ON;
-      break;
+    } else {
+      fade++;
+      analogWrite(POWER, fade);
+      d = cfg.on_delay;
     }
-    fade++;
-    analogWrite(POWER, fade);
-    d = cfg.on_delay;
     break;
   }
   delay(d);
