@@ -24,13 +24,15 @@ public:
   char password[33];
   char hostname[17];
   char mqtt_server[33];
-  int interval_time = INTERVAL_TIME;
-  int inactive_time = INACTIVE_TIME;
-  int threshold = THRESHOLD;
+  long interval_time = INTERVAL_TIME;
+  long inactive_time = INACTIVE_TIME;
+  unsigned threshold = THRESHOLD;
   int switch_idx = -1;
   int pir_idx = -1;
-  int on_delay = 0;
-  int off_delay = 0;
+  unsigned on_delay = 0;
+  unsigned off_delay = 0;
+  unsigned on_bright;
+  unsigned off_bright;
 
   void configure(JsonObject &o);
 } cfg;
@@ -42,11 +44,13 @@ void config::configure(JsonObject &o) {
   strncpy(mqtt_server, o[F("mqtt_server")] | "", sizeof(mqtt_server));
   interval_time = 1000 * (long)o[F("interval_time")];
   inactive_time = 1000 * (long)o[F("inactive_time")];
-  threshold = (int)o[F("threshold")];
+  threshold = (unsigned)o[F("threshold")];
   switch_idx = (int)o[F("switch_idx")];
   pir_idx = (int)o[F("pir_idx")];
-  on_delay = (int)o[F("on_delay")];
-  off_delay = (int)o[F("off_delay")];
+  on_delay = (unsigned)o[F("on_delay")];
+  off_delay = (unsigned)o[F("off_delay")];
+  on_bright = (unsigned)o[F("on_bright")];
+  off_bright = (unsigned)o[F("off_bright")];
 }
 
 #define PIR   D2
@@ -184,6 +188,10 @@ void setup() {
   Serial.println(cfg.on_delay);
   Serial.print(F("Off delay: "));
   Serial.println(cfg.off_delay);
+  Serial.print(F("On bright: "));
+  Serial.println(cfg.on_bright);
+  Serial.print(F("Off bright: "));
+  Serial.println(cfg.off_bright);
 
   WiFi.mode(WIFI_STA);
   WiFi.hostname(cfg.hostname);
@@ -252,6 +260,7 @@ void setup() {
     });
 
     flash(250, 2);
+    analogWrite(POWER, cfg.off_bright);
   }
 }
 
@@ -283,7 +292,7 @@ void loop() {
     mqtt_client.loop();
     
   static int last_pir;
-  static int fade;
+  static unsigned fade;
   long now = millis();
   int light = sampleLight();
   int pir = digitalRead(PIR);
@@ -305,7 +314,7 @@ void loop() {
   case AUTO_OFF:
   case MQTT_OFF:
   case DOMOTICZ_OFF:
-    if (fade == 0) {
+    if (fade == cfg.off_bright) {
       pub(STAT_PWR, false);
       if (state != DOMOTICZ_OFF)
         domoticz_pub(cfg.switch_idx, false);
@@ -323,7 +332,7 @@ void loop() {
   case AUTO_ON:
   case MQTT_ON:
   case DOMOTICZ_ON:
-    if (fade == PWMRANGE) {
+    if (fade == cfg.on_bright) {
       pub(STAT_PWR, true);
       if (state != DOMOTICZ_ON)
         domoticz_pub(cfg.switch_idx, true);
