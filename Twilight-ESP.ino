@@ -92,8 +92,6 @@ inline bool isOn() {
   return state == ON || state == TURNING_ON || state == DOMOTICZ_ON;
 }
 
-static int samples[SAMPLES], pos, smoothed;
-static long total;
 static long last_activity;
 static bool connected;
 
@@ -112,6 +110,8 @@ static void domoticz_pub(int idx, int val) {
 }
 
 static int sampleLight() {
+  static int samples[SAMPLES], pos;
+  static long total;
   static long last_sample;
   static int n;
   int light = analogRead(A0);
@@ -121,7 +121,7 @@ static int sampleLight() {
   if (n < SAMPLES)
     n++;
   if (pos == SAMPLES) pos = 0;
-  smoothed = (int)(total / n);
+  int smoothed = (int)(total / n);
   
   long now = millis();
   if (now - last_sample > cfg.interval_time) {
@@ -241,8 +241,8 @@ void setup() {
       if (strcmp(topic, FROM_DOMOTICZ) == 0) {
         DynamicJsonBuffer buf(JSON_OBJECT_SIZE(14) + 230);
         JsonObject& root = buf.parseObject(payload);
-        if (root["idx"] == cfg.switch_idx) {
-          if (root["nvalue"] == 1) {
+        if (root[F("idx")] == cfg.switch_idx) {
+          if (root[F("nvalue")] == 1) {
             if (isOff())
               state = DOMOTICZ_ON;
           } else if (isOn())
