@@ -62,19 +62,13 @@ void config::configure(JsonObject &o) {
 #define CMND  "cmnd/twilight/"
 #define STAT  "stat/twilight/"
 #define PWR   "power"
-#define INTVL "intvl"
 #define LIGHT "light"
-#define TIME  "time"
 #define STAT_PWR  STAT PWR
 #define STAT_PIR  STAT "pir"
-#define STAT_INTVL  STAT INTVL
 #define STAT_LIGHT  STAT LIGHT
-#define STAT_TIME  STAT TIME
 #define CMND_ALL  CMND "+"
 #define CMND_PWR  CMND PWR
-#define CMND_INTVL CMND INTVL
 #define CMND_LIGHT CMND LIGHT
-#define CMND_TIME CMND TIME
 #define TO_DOMOTICZ "domoticz/in"
 #define FROM_DOMOTICZ "domoticz/out"
 
@@ -293,6 +287,7 @@ void loop() {
     
   static int last_pir;
   static unsigned fade;
+  static State last_state;
   long now = millis();
   int light = sampleLight();
   int pir = digitalRead(PIR);
@@ -315,7 +310,6 @@ void loop() {
   case MQTT_OFF:
   case DOMOTICZ_OFF:
     if (fade == cfg.off_bright) {
-      pub(STAT_PWR, false);
       if (state != DOMOTICZ_OFF)
         domoticz_pub(cfg.switch_idx, false);
       state = OFF;
@@ -333,7 +327,6 @@ void loop() {
   case MQTT_ON:
   case DOMOTICZ_ON:
     if (fade == cfg.on_bright) {
-      pub(STAT_PWR, true);
       if (state != DOMOTICZ_ON)
         domoticz_pub(cfg.switch_idx, true);
       state = ON;
@@ -343,6 +336,10 @@ void loop() {
       d = cfg.on_delay;
     }
     break;
+  }
+  if (state != last_state) {
+      pub(STAT_PWR, state);
+      last_state = state;
   }
   delay(d);
 }
