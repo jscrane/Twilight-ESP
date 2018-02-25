@@ -27,10 +27,10 @@ public:
   long interval_time = INTERVAL_TIME;
   long inactive_time = INACTIVE_TIME;
   unsigned threshold = THRESHOLD;
-  int switch_idx = -1;
-  int pir_idx = -1;
-  unsigned on_delay = 0;
-  unsigned off_delay = 0;
+  int switch_idx;
+  int pir_idx;
+  unsigned on_delay;
+  unsigned off_delay;
   unsigned on_bright;
   unsigned off_bright;
 
@@ -38,19 +38,19 @@ public:
 } cfg;
 
 void config::configure(JsonObject &o) {
-  strncpy(ssid, o[F("ssid")] | "", sizeof(ssid));
-  strncpy(password, o[F("password")] | "", sizeof(password));
-  strncpy(hostname, o[F("hostname")] | "", sizeof(hostname));
-  strncpy(mqtt_server, o[F("mqtt_server")] | "", sizeof(mqtt_server));
+  strlcpy(ssid, o[F("ssid")] | "", sizeof(ssid));
+  strlcpy(password, o[F("password")] | "", sizeof(password));
+  strlcpy(hostname, o[F("hostname")] | "", sizeof(hostname));
+  strlcpy(mqtt_server, o[F("mqtt_server")] | "", sizeof(mqtt_server));
   interval_time = 1000 * (long)o[F("interval_time")];
   inactive_time = 1000 * (long)o[F("inactive_time")];
-  threshold = (unsigned)o[F("threshold")];
-  switch_idx = (int)o[F("switch_idx")];
-  pir_idx = (int)o[F("pir_idx")];
-  on_delay = (unsigned)o[F("on_delay")];
-  off_delay = (unsigned)o[F("off_delay")];
-  on_bright = (unsigned)o[F("on_bright")];
-  off_bright = (unsigned)o[F("off_bright")];
+  threshold = o[F("threshold")];
+  switch_idx = o[F("switch_idx")] | -1;
+  pir_idx = o[F("pir_idx")] | -1;
+  on_delay = o[F("on_delay")] | 0;
+  off_delay = o[F("off_delay")] | 0;
+  on_bright = o[F("on_bright")] | PWMRANGE;
+  off_bright = o[F("off_bright")] | 0;
 }
 
 #define PIR   D2
