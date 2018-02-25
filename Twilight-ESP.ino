@@ -235,19 +235,21 @@ void setup() {
     mqtt_client.setServer(cfg.mqtt_server, 1883);
     mqtt_client.setCallback([](char *topic, byte *payload, unsigned int length) {
       if (strcmp(topic, CMND_PWR) == 0) {
-        bool cmdOn = *payload == '1';
+        last_activity = millis();
+        bool cmdOn = (*payload == '1');
         if (cmdOn && isOff())
           state = MQTT_ON;
-        else if (isOn())
+        else if (!cmdOn && isOn())
           state = MQTT_OFF;
       } else if (strcmp(topic, FROM_DOMOTICZ) == 0) {
         DynamicJsonBuffer buf(JSON_OBJECT_SIZE(14) + 230);
         JsonObject& root = buf.parseObject(payload);
         if (root[F("idx")] == cfg.switch_idx) {
-          bool cmdOn = root[F("nvalue")] == 1;
-          if (cmdOn && isOff())
+          last_activity = millis();
+          int v = (int)root[F("nvalue")];
+          if (v == 1 && isOff())
             state = DOMOTICZ_ON;
-          else if (isOn())
+          else if (v == 0 && isOn())
             state = DOMOTICZ_OFF;
         }
       }
@@ -310,8 +312,7 @@ void loop() {
   case MQTT_OFF:
   case DOMOTICZ_OFF:
     if (fade == cfg.off_bright) {
-      if (state != DOMOTICZ_OFF)
-        domoticz_pub(cfg.switch_idx, false);
+      domoticz_pub(cfg.switch_idx, false);
       state = OFF;
     } else {
       fade--;
@@ -327,8 +328,7 @@ void loop() {
   case MQTT_ON:
   case DOMOTICZ_ON:
     if (fade == cfg.on_bright) {
-      if (state != DOMOTICZ_ON)
-        domoticz_pub(cfg.switch_idx, true);
+      domoticz_pub(cfg.switch_idx, true);
       state = ON;
     } else {
       fade++;
