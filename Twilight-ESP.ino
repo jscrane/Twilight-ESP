@@ -45,12 +45,12 @@ void config::configure(JsonObject &o) {
   interval_time = 1000 * (long)o[F("interval_time")];
   inactive_time = 1000 * (long)o[F("inactive_time")];
   threshold = o[F("threshold")];
-  switch_idx = o[F("switch_idx")] | -1;
-  pir_idx = o[F("pir_idx")] | -1;
-  on_delay = o[F("on_delay")] | 0;
-  off_delay = o[F("off_delay")] | 0;
-  on_bright = o[F("on_bright")] | PWMRANGE;
-  off_bright = o[F("off_bright")] | 0;
+  switch_idx = o[F("switch_idx")];
+  pir_idx = o[F("pir_idx")];
+  on_delay = o[F("on_delay")];
+  off_delay = o[F("off_delay")];
+  on_bright = o[F("on_bright")];
+  off_bright = o[F("off_bright")];
 }
 
 #define PIR   D2
