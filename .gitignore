@@ -1,3 +1,9 @@
 eagle/*.lck
 */*.swp
 *.s#?
+.lib
+*.cpp.d
+*.cpp.o
+*.ino.o
+*.ino.elf
+*.ino.bin
