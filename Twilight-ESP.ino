@@ -341,8 +341,8 @@ void loop() {
 		break;
 	}
 	if (state != last_state) {
-			pub(STAT_PWR, state);
-			last_state = state;
+		pub(STAT_PWR, state);
+		last_state = state;
 	}
 	delay(d);
 }
