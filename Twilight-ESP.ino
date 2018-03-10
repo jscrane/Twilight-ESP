@@ -49,24 +49,24 @@ void config::configure(JsonObject &o) {
 	off_bright = o[F("off_bright")];
 }
 
-#define PIR	 D2
-#define PIR_LED D4
-#define POWER D1
-#define HZ		4
-#define SAMPLES (15*HZ)
+#define PIR	D2
+#define PIR_LED	D4
+#define POWER	D1
+#define HZ	4
+#define SAMPLES	(15*HZ)
 
 #define CMND	"cmnd/twilight/"
 #define STAT	"stat/twilight/"
-#define PWR	 "power"
-#define LIGHT "light"
+#define PWR	"power"
+#define LIGHT	"light"
 #define STAT_PWR	STAT PWR
 #define STAT_PIR	STAT "pir"
 #define STAT_LIGHT	STAT LIGHT
 #define CMND_ALL	CMND "+"
 #define CMND_PWR	CMND PWR
-#define CMND_LIGHT CMND LIGHT
-#define TO_DOMOTICZ "domoticz/in"
-#define FROM_DOMOTICZ "domoticz/out"
+#define CMND_LIGHT	CMND LIGHT
+#define TO_DOMOTICZ	"domoticz/in"
+#define FROM_DOMOTICZ	"domoticz/out"
 
 enum State {
 	START = 0,
@@ -109,7 +109,7 @@ static void domoticz_pub(int idx, int val) {
 static int sampleLight() {
 	static int samples[SAMPLES], pos;
 	static long total;
-	static long last_sample;
+	static long last_pub;
 	static int n;
 	int light = analogRead(A0);
 
@@ -121,8 +121,8 @@ static int sampleLight() {
 	int smoothed = (int)(total / n);
 	
 	long now = millis();
-	if (now - last_sample > cfg.interval_time) {
-		last_sample = now;
+	if (now - last_pub > cfg.interval_time) {
+		last_pub = now;
 		pub(STAT_LIGHT, smoothed);
 	}
 	return smoothed;
@@ -266,7 +266,8 @@ static void mqtt_connect() {
 		Serial.print(F("MQTT connection to: "));
 		Serial.print(cfg.mqtt_server);
 		Serial.print(F(" failed, rc="));
-		Serial.print(mqtt_client.state());
+		Serial.println(mqtt_client.state());
+		flash(PIR_LED, 100, 2);
 	}
 }
 
