@@ -52,7 +52,7 @@ void config::configure(JsonObject &o) {
 #define PIR	D2
 #define PIR_LED	D4
 #define POWER	D1
-#define HZ	4
+#define HZ	1
 #define SAMPLES	(15*HZ)
 
 #define CMND	"cmnd/twilight/"
@@ -68,7 +68,7 @@ void config::configure(JsonObject &o) {
 #define TO_DOMOTICZ	"domoticz/in"
 #define FROM_DOMOTICZ	"domoticz/out"
 
-enum State {
+static enum State {
 	START = 0,
 	OFF,
 	ON,
@@ -78,8 +78,7 @@ enum State {
 	MQTT_ON,
 	DOMOTICZ_OFF,
 	DOMOTICZ_ON
-};
-static State state;
+} state;
 
 inline bool isOff() {
 	return state == START || state == OFF || state == AUTO_OFF || state == MQTT_OFF || state == DOMOTICZ_OFF;
@@ -92,14 +91,47 @@ inline bool isOn() {
 static long last_activity;
 static bool connected;
 
-static void pub(const char *topic, int val) {
-	char msg[16];
-	snprintf(msg, sizeof(msg), "%d", val);
-	mqtt_client.publish(topic, msg);
+static void flash(int pin, int ms, int n) {
+	bool v = digitalRead(pin);
+	for (int i = 0; i < n; i++) {
+		digitalWrite(pin, !v);
+		delay(ms);
+		digitalWrite(pin, v);
+		delay(ms);
+	}
+}
+
+static bool mqtt_connect(PubSubClient &c) {
+	if (c.connected())
+		return true;
+	if (c.connect(cfg.hostname)) {
+		c.subscribe(CMND_ALL);
+		c.subscribe(FROM_DOMOTICZ);
+		return true;
+	}
+	Serial.print(F("MQTT connection to: "));
+	Serial.print(cfg.mqtt_server);
+	Serial.print(F(" failed, rc="));
+	Serial.println(mqtt_client.state());
+	flash(PIR_LED, 100, 2);
+	return false;
+}
+
+static void mqtt_loop(PubSubClient &c) {
+	if (mqtt_connect(c))
+		c.loop();
+}
+
+static void mqtt_pub(const char *topic, int val) {
+	if (mqtt_connect(mqtt_client)) {
+		char msg[16];
+		snprintf(msg, sizeof(msg), "%d", val);
+		mqtt_client.publish(topic, msg);
+	}
 }
 
 static void domoticz_pub(int idx, int val) {
-	if (idx != -1) {
+	if (idx != -1 && mqtt_connect(mqtt_client)) {
 		char msg[64];
 		snprintf(msg, sizeof(msg), "{\"idx\":%d,\"nvalue\":%d,\"svalue\":\"\"}", idx, val);
 		mqtt_client.publish(TO_DOMOTICZ, msg);
@@ -119,35 +151,25 @@ static int sampleLight() {
 		n++;
 	if (pos == SAMPLES) pos = 0;
 	int smoothed = (int)(total / n);
-	
+
 	long now = millis();
 	if (now - last_pub > cfg.interval_time) {
 		last_pub = now;
-		pub(STAT_LIGHT, smoothed);
+		mqtt_pub(STAT_LIGHT, smoothed);
 	}
 	return smoothed;
 }
 
-static void flash(int pin, int ms, int n) {
-	for (int i = 0; i < n; i++) {
-		bool on = digitalRead(pin);
-		digitalWrite(pin, !on);
-		delay(ms);
-		digitalWrite(pin, on);
-		delay(ms);			
-	}
-}
+static volatile bool pir;
 
 void setup() {
 	Serial.begin(115200);
 	Serial.println(F("Booting!"));
-	
+
 	pinMode(PIR, INPUT);
 	pinMode(POWER, OUTPUT);
 	pinMode(PIR_LED, OUTPUT);
 
-	digitalWrite(POWER, LOW);
-	digitalWrite(PIR_LED, LOW);
 	flash(PIR_LED, 500, 2);
 	flash(POWER, 500, 2);
 
@@ -230,7 +252,8 @@ void setup() {
 		Serial.print(F("Connected to "));
 		Serial.println(cfg.ssid);
 		Serial.println(WiFi.localIP());
-	
+		flash(POWER, 250, 2);
+
 		mqtt_client.setServer(cfg.mqtt_server, 1883);
 		mqtt_client.setCallback([](char *topic, byte *payload, unsigned int length) {
 			if (strcmp(topic, CMND_PWR) == 0) {
@@ -253,22 +276,10 @@ void setup() {
 				}
 			}
 		});
-
-		flash(POWER, 250, 2);
 	}
-}
-
-static void mqtt_connect() {
-	if (mqtt_client.connect(cfg.hostname)) {
-		mqtt_client.subscribe(CMND_ALL);
-		mqtt_client.subscribe(FROM_DOMOTICZ);
-	} else {
-		Serial.print(F("MQTT connection to: "));
-		Serial.print(cfg.mqtt_server);
-		Serial.print(F(" failed, rc="));
-		Serial.println(mqtt_client.state());
-		flash(PIR_LED, 100, 2);
-	}
+	digitalWrite(POWER, LOW);
+	digitalWrite(PIR_LED, HIGH);
+	attachInterrupt(PIR, []() { pir=true; }, RISING);
 }
 
 void loop() {
@@ -279,48 +290,46 @@ void loop() {
 		flash(PIR_LED, 1000, 1);
 		return;
 	}
-	
-	if (!mqtt_client.connected())
-		mqtt_connect();
 
-	if (mqtt_client.connected())
-		mqtt_client.loop();
-		
-	static int last_pir;
-	static unsigned fade;
+	const int tick = 1000 / HZ;
 	static State last_state = START;
+	static unsigned fade;
+	static unsigned last_tick = -tick;
+	static unsigned light;
+
 	long now = millis();
-	int light = sampleLight();
-	int pir = digitalRead(PIR);
-	if (last_pir != pir) {
-		digitalWrite(PIR_LED, !pir);
-		last_pir = pir;
-		pub(STAT_PIR, pir);
-		domoticz_pub(cfg.pir_idx, pir);
-		if (pir) {
-			last_activity = now;
-			if (light > cfg.threshold && isOff())
-				state = AUTO_ON;
-		}
+	if (now - last_tick > tick) {
+		last_tick = now;
+		mqtt_loop(mqtt_client);
+		light = sampleLight();
 	}
-	unsigned d = 1000 / HZ;
+	digitalWrite(PIR_LED, !pir);
+	if (pir) {
+		last_activity = now;
+		if (light > cfg.threshold && isOff())
+			state = AUTO_ON;
+		mqtt_pub(STAT_PIR, pir);
+		domoticz_pub(cfg.pir_idx, pir);
+		pir = false;
+	}
 	switch (state) {
 	case START:
 		state = OFF;
+		fade = cfg.off_bright;
 		break;
 	case OFF:
+		analogWrite(POWER, fade);
 		break;
 	case AUTO_OFF:
 	case MQTT_OFF:
 	case DOMOTICZ_OFF:
 		if (fade == cfg.off_bright) {
 			domoticz_pub(cfg.switch_idx, false);
-			analogWrite(POWER, cfg.off_bright);
 			state = OFF;
 		} else {
 			fade--;
 			analogWrite(POWER, fade);
-			d = cfg.off_delay;
+			delay(cfg.off_delay);
 		}
 		break;
 	case ON:
@@ -336,13 +345,12 @@ void loop() {
 		} else {
 			fade++;
 			analogWrite(POWER, fade);
-			d = cfg.on_delay;
+			delay(cfg.on_delay);
 		}
 		break;
 	}
 	if (state != last_state) {
-		pub(STAT_PWR, state);
 		last_state = state;
+		mqtt_pub(STAT_PWR, state);
 	}
-	delay(d);
 }
