@@ -211,6 +211,7 @@ void setup() {
 	WiFi.mode(WIFI_STA);
 	WiFi.hostname(cfg.hostname);
 	if (*cfg.ssid) {
+		WiFi.setAutoReconnect(true);
 		WiFi.begin(cfg.ssid, cfg.password);
 		for (int i = 0; i < 120 && WiFi.status() != WL_CONNECTED; i++) {
 			flash(PIR_LED, 250, 1);
@@ -286,16 +287,12 @@ void loop() {
 	mdns.update();
 	server.handleClient();
 
-	if (!connected) {
-		flash(PIR_LED, 1000, 1);
-		return;
-	}
-
 	const int tick = 1000 / HZ;
 	static State last_state = START;
 	static unsigned fade;
 	static unsigned last_tick = -tick;
 	static unsigned light;
+	static unsigned last_flash;
 
 	long now = millis();
 	if (now - last_tick > tick) {
@@ -303,7 +300,13 @@ void loop() {
 		mqtt_loop(mqtt_client);
 		light = sampleLight();
 	}
-	digitalWrite(PIR_LED, !pir);
+	if (connected)
+		digitalWrite(PIR_LED, !pir);
+	else if (now - last_flash > 1000) {
+		last_flash = now;
+		digitalWrite(PIR_LED, !digitalRead(PIR_LED));
+	}
+
 	if (pir) {
 		last_activity = now;
 		if (light > cfg.threshold && isOff())
