@@ -1,6 +1,7 @@
 eagle/*.lck
-*/*.swp
+*.swp
 *.s#?
+*.b#?
 .lib
 *.cpp.d
 *.cpp.o
