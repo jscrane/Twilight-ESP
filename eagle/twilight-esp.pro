@@ -1,25 +1,25 @@
 EAGLE AutoRouter Statistics:
 
-Job           : /home/steve/eagle/Twilight-ESP/twilight-esp.brd
+Job           : /home/steve/sketchbook/Twilight-ESP/eagle/twilight-esp.brd
 
-Start at      : 08:16:17 (27/02/2018)
-End at        : 08:16:39 (27/02/2018)
-Elapsed time  : 00:00:18
+Start at      : 14:33:34 (05/07/2018)
+End at        : 14:33:53 (05/07/2018)
+Elapsed time  : 00:00:17
 
-Signals       :     9   RoutingGrid: 9 mil  Layers: 2
-Connections   :    22   predefined:  16 ( 0 Vias )
+Signals       :    10   RoutingGrid: 9 mil  Layers: 2
+Connections   :    24   predefined:  23 ( 0 Vias )
 
 Router memory :   268320
 
 Passname          : TopRouter     Route Optimize1 Optimize2 Optimize3 Optimize4 Optimize5 Optimize6 Optimize7 Optimize8 Optimize9Optimize10Optimize11Optimize12
 
-Time per pass     :  00:00:16  00:00:00  00:00:00  00:00:01  00:00:00  00:00:00  00:00:00  00:00:00  00:00:00  00:00:00  00:00:00  00:00:01  00:00:00  00:00:00
+Time per pass     :  00:00:15  00:00:00  00:00:01  00:00:00  00:00:00  00:00:00  00:00:00  00:00:00  00:00:00  00:00:00  00:00:00  00:00:00  00:00:00  00:00:01
 Number of Ripups  :         0         0         0         0         0         0         0         0         0         0         0         0         0         0
 max. Level        :         0         0         0         0         0         0         0         0         0         0         0         0         0         0
 max. Total        :         0         0         0         0         0         0         0         0         0         0         0         0         0         0
 
-Routed            :         0         6         6         6         6         6         6         6         6         6         6         6         6         6
+Routed            :         0         1         1         1         1         1         1         1         1         1         1         1         1         1
 Vias              :         0         0         0         0         0         0         0         0         0         0         0         0         0         0
-Resolution        :    72.7 %   100.0 %   100.0 %   100.0 %   100.0 %   100.0 %   100.0 %   100.0 %   100.0 %   100.0 %   100.0 %   100.0 %   100.0 %   100.0 %
+Resolution        :    95.8 %   100.0 %   100.0 %   100.0 %   100.0 %   100.0 %   100.0 %   100.0 %   100.0 %   100.0 %   100.0 %   100.0 %   100.0 %   100.0 %
 
-Final             : 100.0% finished
+Final             : 
