@@ -4,6 +4,8 @@
 #include <ESP8266mDNS.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266HTTPUpdateServer.h>
+
+#define MQTT_MAX_PACKET_SIZE 512
 #include <PubSubClient.h>
 
 #include "Configuration.h"
