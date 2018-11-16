@@ -1,6 +1,7 @@
 #include <ArduinoJson.h>
 #include <FS.h>
 #include <ESP8266WiFi.h>
+#include <DNSServer.h>
 #include <ESP8266mDNS.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266HTTPUpdateServer.h>
@@ -15,6 +16,7 @@ WiFiClient wifiClient;
 PubSubClient mqtt_client(wifiClient);
 ESP8266WebServer server(80);
 ESP8266HTTPUpdateServer httpUpdater;
+DNSServer dnsServer;
 
 class config: public Configuration {
 public:
@@ -250,7 +252,8 @@ void setup() {
 		WiFi.softAP(cfg.hostname);
 		Serial.print(F("Connect to SSID: "));
 		Serial.print(cfg.hostname);
-		Serial.println(F(" and URL http://192.168.4.1 to configure WIFI"));
+		Serial.println(F(" to configure WIFI"));
+		dnsServer.start(53, "*", WiFi.softAPIP());
 	} else {
 		Serial.print(F("Connected to "));
 		Serial.println(cfg.ssid);
@@ -304,9 +307,12 @@ void loop() {
 	}
 	if (connected)
 		digitalWrite(PIR_LED, !pir);
-	else if (now - last_flash > 1000) {
-		last_flash = now;
-		digitalWrite(PIR_LED, !digitalRead(PIR_LED));
+	else {
+		dnsServer.processNextRequest();
+		if (now - last_flash > 1000) {
+			last_flash = now;
+			digitalWrite(PIR_LED, !digitalRead(PIR_LED));
+		}
 	}
 
 	if (pir) {
