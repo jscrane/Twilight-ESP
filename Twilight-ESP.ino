@@ -34,10 +34,10 @@ public:
 	unsigned on_bright;
 	unsigned off_bright;
 
-	void configure(JsonObject &o);
+	void configure(JsonDocument &o);
 } cfg;
 
-void config::configure(JsonObject &o) {
+void config::configure(JsonDocument &o) {
 	strlcpy(ssid, o[F("ssid")] | "", sizeof(ssid));
 	strlcpy(password, o[F("password")] | "", sizeof(password));
 	strlcpy(hostname, o[F("hostname")] | "", sizeof(hostname));
@@ -166,6 +166,8 @@ static int sampleLight() {
 
 static volatile bool pir;
 
+void ICACHE_RAM_ATTR pir_handler() { pir = true; }
+
 void setup() {
 	Serial.begin(115200);
 	Serial.println(F("Booting!"));
@@ -189,6 +191,12 @@ void setup() {
 		return;
 	}
 
+	Serial.print(F("MAC: "));
+	Serial.println(WiFi.macAddress());
+	Serial.print(F("SSID: "));
+	Serial.println(cfg.ssid);
+	Serial.print(F("Password: "));
+	Serial.println(cfg.password);
 	Serial.print(F("Hostname: "));
 	Serial.println(cfg.hostname);
 	Serial.print(F("MQTT Server: "));
@@ -217,9 +225,11 @@ void setup() {
 	if (*cfg.ssid) {
 		WiFi.setAutoReconnect(true);
 		WiFi.begin(cfg.ssid, cfg.password);
+		const char s[] = "|/-\\";
 		for (int i = 0; i < 120 && WiFi.status() != WL_CONNECTED; i++) {
 			flash(PIR_LED, 250, 1);
-			Serial.print('.');
+			Serial.print(s[i % 4]);
+			Serial.print('\r');
 		}
 		Serial.println();
 		connected = WiFi.status() == WL_CONNECTED;
@@ -231,6 +241,7 @@ void setup() {
 			File f = SPIFFS.open("/config.json", "w");
 			f.print(body);
 			f.close();
+			server.send(200);
 			ESP.restart();
 		} else
 			server.send(400, "text/plain", "No body!");
@@ -270,11 +281,13 @@ void setup() {
 				else if (!cmdOn && isOn())
 					state = MQTT_OFF;
 			} else if (strcmp(topic, FROM_DOMOTICZ) == 0) {
-				DynamicJsonBuffer buf(JSON_OBJECT_SIZE(14) + 230);
-				JsonObject& root = buf.parseObject(payload);
-				if (root[F("idx")] == cfg.switch_idx) {
+				DynamicJsonDocument doc(JSON_OBJECT_SIZE(14) + 300);
+				auto error = deserializeJson(doc, payload);
+				if (error)
+					return;
+				if (doc[F("idx")] == cfg.switch_idx) {
 					last_activity = millis();
-					int v = (int)root[F("nvalue")];
+					int v = (int)doc[F("nvalue")];
 					if (v == 1 && isOff())
 						state = DOMOTICZ_ON;
 					else if (v == 0 && isOn())
@@ -285,7 +298,7 @@ void setup() {
 	}
 	digitalWrite(POWER, LOW);
 	digitalWrite(PIR_LED, HIGH);
-	attachInterrupt(PIR, []() { pir=true; }, RISING);
+	attachInterrupt(PIR, pir_handler, RISING);
 }
 
 void loop() {

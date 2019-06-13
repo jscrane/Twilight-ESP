@@ -3,17 +3,16 @@
 #include "Configuration.h"
 
 bool Configuration::read_file(const char *filename) {
-  File f = SPIFFS.open(filename, "r");
-  if (!f)
-    return false;
+	File f = SPIFFS.open(filename, "r");
+	if (!f)
+		return false;
 
-  DynamicJsonBuffer json(JSON_OBJECT_SIZE(13) + 230);
-  JsonObject &root = json.parseObject(f);
-  f.close();
-  if (!root.success())
-    return false;
+	DynamicJsonDocument doc(JSON_OBJECT_SIZE(13) + 300);
+	auto error = deserializeJson(doc, f);
+	f.close();
+	if (error)
+		return false;
 
-  configure(root);
-  return true;
+	configure(doc);
+	return true;
 }
-
