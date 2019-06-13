@@ -2,9 +2,8 @@ eagle/*.lck
 *.swp
 *.s#?
 *.b#?
-.lib
+.build
 *.cpp.d
 *.cpp.o
 *.ino.o
-*.ino.elf
-*.ino.bin
+platform.mk
