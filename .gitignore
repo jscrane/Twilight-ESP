@@ -6,4 +6,5 @@ eagle/*.lck
 *.cpp.d
 *.cpp.o
 *.ino.o
-platform.mk
+platform.txt.mk
+boards.txt.mk
