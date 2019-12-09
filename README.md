@@ -7,7 +7,7 @@ See [blog articles](https://programmablehardware.blogspot.ie/search?q=twilight).
 
 ## Requires:
 - Arduino 1.8.9
-- ESP8266 [Arduino core](https://github.com/esp8266/Arduino) 2.6.0
+- ESP8266 [Arduino core](https://github.com/esp8266/Arduino) 2.6.2
 - Wemos [D1 Mini](https://wiki.wemos.cc/products:d1:d1_mini)
 - [PubSubClient](https://pubsubclient.knolleary.net) 2.7
 - [ArduinoJson](https://github.com/bblanchon/ArduinoJson) 6.13.0
