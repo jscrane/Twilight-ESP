@@ -74,14 +74,14 @@ void config::configure(JsonDocument &o) {
 
 static enum State {
 	START = 0,
-	OFF,
-	ON,
-	AUTO_OFF,
-	AUTO_ON,
-	MQTT_OFF,
-	MQTT_ON,
-	DOMOTICZ_OFF,
-	DOMOTICZ_ON
+	OFF = 1,
+	ON = 2,
+	AUTO_OFF = 3,
+	AUTO_ON = 4,
+	MQTT_OFF = 5,
+	MQTT_ON = 6,
+	DOMOTICZ_OFF = 7,
+	DOMOTICZ_ON = 8
 } state;
 
 inline bool isOff() {
@@ -160,28 +160,18 @@ static void sampleLight() {
 	light = (int)(total / n);
 }
 
-static void reportLight() {
-	mqtt_pub(STAT_LIGHT, light);
-}
-
 static void activity() {
 	timers.restartTimer(watchdog);
 }
 
 static void fade_off() {
-	if (fade > cfg.off_bright) {
-		fade--;
-		analogWrite(POWER, fade);
-	} else
-		timers.disable(fadeOff);
+	if (fade > cfg.off_bright)
+		analogWrite(POWER, --fade);
 }
 
 static void fade_on() {
-	if (fade < cfg.on_bright) {
-		fade++;
-		analogWrite(POWER, fade);
-	} else
-		timers.disable(fadeOn);
+	if (fade < cfg.on_bright)
+		analogWrite(POWER, ++fade);
 }
 
 void setup() {
@@ -301,9 +291,10 @@ void setup() {
 				auto error = deserializeJson(doc, payload);
 				if (error)
 					return;
-				if (doc[F("idx")] == cfg.switch_idx) {
+				int idx = doc[F("idx")] | -1;
+				if (idx == cfg.switch_idx) {
 					activity();
-					int v = (int)doc[F("nvalue")];
+					int v = doc[F("nvalue")] | -1;
 					if (v == 1 && isOff())
 						state = DOMOTICZ_ON;
 					else if (v == 0 && isOn())
@@ -325,7 +316,7 @@ void setup() {
 	watchdog = timers.setInterval(cfg.inactive_time, []() { state = AUTO_OFF; });
 	timers.disable(watchdog);
 
-	timers.setInterval(cfg.interval_time, reportLight);
+	timers.setInterval(cfg.interval_time, []() { mqtt_pub(STAT_LIGHT, light); });
 	timers.setInterval(1000 / HZ, sampleLight);
 	sampleLight();
 
