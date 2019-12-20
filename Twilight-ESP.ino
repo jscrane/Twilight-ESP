@@ -6,6 +6,7 @@
 #include <ESP8266WebServer.h>
 #include <ESP8266HTTPUpdateServer.h>
 #include <PubSubClient.h>
+#include <SimpleTimer.h>
 
 #include "Configuration.h"
 
@@ -15,6 +16,7 @@ PubSubClient mqtt_client(wifiClient);
 ESP8266WebServer server(80);
 ESP8266HTTPUpdateServer httpUpdater;
 DNSServer dnsServer;
+SimpleTimer timers;
 
 class config: public Configuration {
 public:
@@ -54,7 +56,7 @@ void config::configure(JsonDocument &o) {
 #define PIR	D2
 #define PIR_LED	D4
 #define POWER	D1
-#define HZ	1
+#define HZ	5
 #define SAMPLES	(15*HZ)
 
 #define CMND	"cmnd/twilight/"
@@ -90,7 +92,6 @@ inline bool isOn() {
 	return state == ON || state == AUTO_ON || state == MQTT_ON || state == DOMOTICZ_ON;
 }
 
-static long last_activity;
 static bool connected;
 
 static void flash(int pin, int ms, int n) {
@@ -119,11 +120,6 @@ static bool mqtt_connect(PubSubClient &c) {
 	return false;
 }
 
-static void mqtt_loop(PubSubClient &c) {
-	if (mqtt_connect(c))
-		c.loop();
-}
-
 static void mqtt_pub(const char *topic, int val) {
 	if (mqtt_connect(mqtt_client)) {
 		char msg[16];
@@ -140,31 +136,53 @@ static void domoticz_pub(int idx, int val) {
 	}
 }
 
-static int sampleLight() {
-	static int samples[SAMPLES], pos;
-	static long total;
-	static long last_pub;
-	static int n;
-	int light = analogRead(A0);
-
-	total += light - samples[pos];
-	samples[pos++] = light;
-	if (n < SAMPLES)
-		n++;
-	if (pos == SAMPLES) pos = 0;
-	int smoothed = (int)(total / n);
-
-	long now = millis();
-	if (now - last_pub > cfg.interval_time) {
-		last_pub = now;
-		mqtt_pub(STAT_LIGHT, smoothed);
-	}
-	return smoothed;
-}
-
 static volatile bool pir;
 
 void ICACHE_RAM_ATTR pir_handler() { pir = true; }
+
+// timers
+static unsigned light;
+static unsigned fade;
+static int watchdog, flasher, poller;
+static int fadeOn, fadeOff;
+
+static void sampleLight() {
+	static int samples[SAMPLES], pos;
+	static long total;
+	static int n;
+	int sample = analogRead(A0);
+
+	total += sample - samples[pos];
+	samples[pos++] = sample;
+	if (n < SAMPLES)
+		n++;
+	if (pos == SAMPLES) pos = 0;
+	light = (int)(total / n);
+}
+
+static void reportLight() {
+	mqtt_pub(STAT_LIGHT, light);
+}
+
+static void activity() {
+	timers.restartTimer(watchdog);
+}
+
+static void fade_off() {
+	if (fade > cfg.off_bright) {
+		fade--;
+		analogWrite(POWER, fade);
+	} else
+		timers.disable(fadeOff);
+}
+
+static void fade_on() {
+	if (fade < cfg.on_bright) {
+		fade++;
+		analogWrite(POWER, fade);
+	} else
+		timers.disable(fadeOn);
+}
 
 void setup() {
 	Serial.begin(115200);
@@ -272,7 +290,7 @@ void setup() {
 		mqtt_client.setServer(cfg.mqtt_server, 1883);
 		mqtt_client.setCallback([](char *topic, byte *payload, unsigned int length) {
 			if (strcmp(topic, CMND_PWR) == 0) {
-				last_activity = millis();
+				activity();
 				bool cmdOn = (*payload == '1');
 				if (cmdOn && isOff())
 					state = MQTT_ON;
@@ -284,7 +302,7 @@ void setup() {
 				if (error)
 					return;
 				if (doc[F("idx")] == cfg.switch_idx) {
-					last_activity = millis();
+					activity();
 					int v = (int)doc[F("nvalue")];
 					if (v == 1 && isOff())
 						state = DOMOTICZ_ON;
@@ -297,37 +315,40 @@ void setup() {
 	digitalWrite(POWER, LOW);
 	digitalWrite(PIR_LED, HIGH);
 	attachInterrupt(PIR, pir_handler, RISING);
+
+	fadeOff = timers.setInterval(cfg.off_delay, fade_off);
+	timers.disable(fadeOff);
+
+	fadeOn = timers.setInterval(cfg.on_delay, fade_on);
+	timers.disable(fadeOn);
+
+	watchdog = timers.setInterval(cfg.inactive_time, []() { state = AUTO_OFF; });
+	timers.disable(watchdog);
+
+	timers.setInterval(cfg.interval_time, reportLight);
+	timers.setInterval(1000 / HZ, sampleLight);
+	sampleLight();
+
+	flasher = timers.setInterval(1000, []() { digitalWrite(PIR_LED, !digitalRead(PIR_LED)); });
+	poller = timers.setInterval(100, []() { mqtt_client.loop(); });
 }
 
 void loop() {
 	mdns.update();
 	server.handleClient();
 
-	const int tick = 1000 / HZ;
-	static State last_state = START;
-	static unsigned fade;
-	static unsigned last_tick = -tick;
-	static unsigned light;
-	static unsigned last_flash;
-
-	long now = millis();
-	if (now - last_tick > tick) {
-		last_tick = now;
-		mqtt_loop(mqtt_client);
-		light = sampleLight();
-	}
-	if (connected)
+	if (connected) {
 		digitalWrite(PIR_LED, !pir);
-	else {
+		timers.disable(flasher);
+		timers.enable(poller);
+	} else {
 		dnsServer.processNextRequest();
-		if (now - last_flash > 1000) {
-			last_flash = now;
-			digitalWrite(PIR_LED, !digitalRead(PIR_LED));
-		}
+		timers.enable(flasher);
+		timers.disable(poller);
 	}
 
 	if (pir) {
-		last_activity = now;
+		activity();
 		if (light > cfg.threshold && isOff())
 			state = AUTO_ON;
 		mqtt_pub(STAT_PIR, pir);
@@ -345,34 +366,36 @@ void loop() {
 	case AUTO_OFF:
 	case MQTT_OFF:
 	case DOMOTICZ_OFF:
-		if (fade == cfg.off_bright) {
+		if (fade == cfg.on_bright)
+			timers.enable(fadeOff);
+		else if (fade == cfg.off_bright) {
+			timers.disable(fadeOff);
+			timers.disable(watchdog);
 			domoticz_pub(cfg.switch_idx, false);
 			state = OFF;
-		} else {
-			fade--;
-			analogWrite(POWER, fade);
-			delay(cfg.off_delay);
 		}
 		break;
 	case ON:
-		if ((now - last_activity) > cfg.inactive_time)
-			state = AUTO_OFF;
 		break;
 	case AUTO_ON:
 	case MQTT_ON:
 	case DOMOTICZ_ON:
-		if (fade == cfg.on_bright) {
+		if (fade == cfg.off_bright)
+			timers.enable(fadeOn);
+		else if (fade == cfg.on_bright) {
+			timers.disable(fadeOn);
+			timers.enable(watchdog);
+			timers.restartTimer(watchdog);
 			domoticz_pub(cfg.switch_idx, true);
 			state = ON;
-		} else {
-			fade++;
-			analogWrite(POWER, fade);
-			delay(cfg.on_delay);
 		}
 		break;
 	}
+
+	static State last_state = START;
 	if (state != last_state) {
 		last_state = state;
 		mqtt_pub(STAT_PWR, state);
 	}
+	timers.run();
 }
