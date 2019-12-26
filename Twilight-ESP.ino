@@ -287,7 +287,7 @@ void setup() {
 				else if (!cmdOn && isOn())
 					state = MQTT_OFF;
 			} else if (strcmp(topic, FROM_DOMOTICZ) == 0) {
-				DynamicJsonDocument doc(JSON_OBJECT_SIZE(14) + 300);
+				DynamicJsonDocument doc(JSON_OBJECT_SIZE(16) + 500);
 				auto error = deserializeJson(doc, payload);
 				if (error)
 					return;
@@ -357,6 +357,7 @@ void loop() {
 	case AUTO_OFF:
 	case MQTT_OFF:
 	case DOMOTICZ_OFF:
+		timers.disable(fadeOn);
 		if (fade == cfg.on_bright)
 			timers.enable(fadeOff);
 		else if (fade == cfg.off_bright) {
@@ -371,6 +372,7 @@ void loop() {
 	case AUTO_ON:
 	case MQTT_ON:
 	case DOMOTICZ_ON:
+		timers.disable(fadeOff);
 		if (fade == cfg.off_bright)
 			timers.enable(fadeOn);
 		else if (fade == cfg.on_bright) {
