@@ -109,7 +109,9 @@ static bool mqtt_connect(PubSubClient &c) {
 		return true;
 	if (c.connect(cfg.hostname)) {
 		c.subscribe(CMND_ALL);
+#if defined(DOMOTICZ_CONTROL)
 		c.subscribe(FROM_DOMOTICZ);
+#endif
 		return true;
 	}
 	Serial.print(F("MQTT connection to: "));
