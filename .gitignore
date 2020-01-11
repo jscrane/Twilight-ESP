@@ -8,3 +8,4 @@ eagle/*.lck
 *.ino.o
 platform.txt.mk
 boards.txt.mk
+spiffs.img
