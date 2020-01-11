@@ -33,6 +33,9 @@ public:
 	unsigned off_delay;
 	unsigned on_bright;
 	unsigned off_bright;
+	char to_domoticz[65];
+	char from_domoticz[65];
+	bool domoticz_sub;
 
 	void configure(JsonDocument &o);
 } cfg;
@@ -49,8 +52,11 @@ void config::configure(JsonDocument &o) {
 	pir_idx = o[F("pir_idx")];
 	on_delay = o[F("on_delay")];
 	off_delay = o[F("off_delay")];
-	on_bright = o[F("on_bright")];
-	off_bright = o[F("off_bright")];
+	on_bright = o[F("on_bright")] | 1023;
+	off_bright = o[F("off_bright")] | 0;
+	strlcpy(to_domoticz, o[F("to_domoticz")] | "", sizeof(to_domoticz));
+	strlcpy(from_domoticz, o[F("from_domoticz")] | "", sizeof(from_domoticz));
+	domoticz_sub = o[F("domoticz_sub")];
 }
 
 #define PIR	D2
@@ -69,8 +75,6 @@ void config::configure(JsonDocument &o) {
 #define CMND_ALL	CMND "+"
 #define CMND_PWR	CMND PWR
 #define CMND_LIGHT	CMND LIGHT
-#define TO_DOMOTICZ	"domoticz/in"
-#define FROM_DOMOTICZ	"domoticz/out"
 
 static enum State {
 	START = 0,
@@ -109,9 +113,8 @@ static bool mqtt_connect(PubSubClient &c) {
 		return true;
 	if (c.connect(cfg.hostname)) {
 		c.subscribe(CMND_ALL);
-#if defined(DOMOTICZ_CONTROL)
-		c.subscribe(FROM_DOMOTICZ);
-#endif
+		if (cfg.domoticz_sub)
+			c.subscribe(cfg.from_domoticz);
 		return true;
 	}
 	Serial.print(F("MQTT connection to: "));
@@ -134,7 +137,7 @@ static void domoticz_pub(int idx, int val) {
 	if (idx != -1 && mqtt_connect(mqtt_client)) {
 		char msg[64];
 		snprintf(msg, sizeof(msg), "{\"idx\":%d,\"nvalue\":%d,\"svalue\":\"\"}", idx, val);
-		mqtt_client.publish(TO_DOMOTICZ, msg);
+		mqtt_client.publish(cfg.to_domoticz, msg);
 	}
 }
 
@@ -195,7 +198,7 @@ void setup() {
 	}
 
 	if (!cfg.read_file("/config.json")) {
-		Serial.print(F("config!"));
+		Serial.println(F("config!"));
 		return;
 	}
 
@@ -227,6 +230,12 @@ void setup() {
 	Serial.println(cfg.on_bright);
 	Serial.print(F("Off bright: "));
 	Serial.println(cfg.off_bright);
+	Serial.print(F("To Domoticz: "));
+	Serial.println(cfg.to_domoticz);
+	Serial.print(F("From Domoticz: "));
+	Serial.println(cfg.from_domoticz);
+	Serial.print(F("Domoticz Sub: "));
+	Serial.println(cfg.domoticz_sub);
 
 	WiFi.mode(WIFI_STA);
 	WiFi.hostname(cfg.hostname);
@@ -257,6 +266,7 @@ void setup() {
 	server.serveStatic("/", SPIFFS, "/index.html");
 	server.serveStatic("/config", SPIFFS, "/config.json");
 	server.serveStatic("/js/transparency.min.js", SPIFFS, "/transparency.min.js");
+	server.serveStatic("/info.png", SPIFFS, "/info.png");
 
 	httpUpdater.setup(&server);
 	server.begin();
@@ -288,7 +298,7 @@ void setup() {
 					state = MQTT_ON;
 				else if (!cmdOn && isOn())
 					state = MQTT_OFF;
-			} else if (strcmp(topic, FROM_DOMOTICZ) == 0) {
+			} else if (strcmp(topic, cfg.from_domoticz) == 0) {
 				DynamicJsonDocument doc(JSON_OBJECT_SIZE(16) + 500);
 				auto error = deserializeJson(doc, payload);
 				if (error)

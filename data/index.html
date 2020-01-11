@@ -44,54 +44,82 @@ function save_config() {
   <tr>
     <td>SSID:</td>
     <td><input type="text" id="ssid"></td>
+    <td><img src="info.png" title="Your Wifi network name"/></td>
   </tr>
   <tr>
     <td>Password:</td>
     <td><input type="text" id="password"></td>
+    <td><img src="info.png" title="Your Wifi network password"/></td>
   </tr>
   <tr>
     <td>Hostname:</td>
     <td><input type="text" id="hostname"></td>
+    <td><img src="info.png" title="My hostname on your network"/></td>
   </tr>
   <tr>
     <td>MQTT Server:</td>
     <td><input type="text" id="mqtt_server"></td>
+    <td><img src="info.png" title="Your MQTT server's hostname"/></td>
   </tr>
   <tr>
     <td>Interval Time:</td>
     <td><input type="number" min=0 id="interval_time"></td>
+    <td><img src="info.png" title="Light sampling interval"/></td>
   </tr>
   <tr>
     <td>Inactive Time:</td>
     <td><input type="number" min=0 id="inactive_time"></td>
+    <td><img src="info.png" title="Time light stays on with no movement"/></td>
   </tr>
   <tr>
     <td>Light Threshold:</td>
     <td><input type="number" min=0 max=1023 id="threshold"></td>
-  </tr>
-  <tr>
-    <td>Switch Index:</td>
-    <td><input type="number" min="-1" id="switch_idx"></td>
-  </tr>
-  <tr>
-    <td>PIR Index:</td>
-    <td><input type="number" min="-1" id="pir_idx"></td>
+    <td><img src="info.png" title="Level light comes on at"/></td>
   </tr>
   <tr>
     <td>On delay:</td>
     <td><input type="number" min="0" id="on_delay"></td>
+    <td><img src="info.png" title="Fade-on time"/></td>
   </tr>
   <tr>
     <td>Off delay:</td>
     <td><input type="number" min="0" id="off_delay"></td>
+    <td><img src="info.png" title="Fade-off time"/></td>
   </tr>
   <tr>
     <td>On brightness:</td>
     <td><input type="number" min="0" max=1023 id="on_bright"></td>
+    <td><img src="info.png" title="Brightness when on (usually max: 1023)"/></td>
   </tr>
   <tr>
     <td>Off brightness:</td>
     <td><input type="number" min="0" max=1023 id="off_bright"></td>
+    <td><img src="info.png" title="Brightness when off (usually min: 0)"/></td>
+  </tr>
+  <tr>
+    <td>Switch Index:</td>
+    <td><input type="number" min="-1" id="switch_idx"></td>
+    <td><img src="info.png" title="Domoticz index of Switch device"/></td>
+  </tr>
+  <tr>
+    <td>PIR Index:</td>
+    <td><input type="number" min="-1" id="pir_idx"></td>
+    <td><img src="info.png" title="Domoticz index of PIR device"/></td>
+  </tr>
+  <tr>
+    <td>To Domoticz:</td>
+    <td><input type="text" id="to_domoticz"></td>
+    <td><img src="info.png" title="MQTT topic for Domoticz notifications"/></td>
+  </tr>
+  <tr>
+    <td>From Domoticz:</td>
+    <td><input type="text" id="from_domoticz"></td>
+    <td><img src="info.png" title="MQTT topic for Domoticz commands"/></td>
+  </tr>
+  <tr>
+    <td>Subscribe to Domoticz:</td>
+    <td><input type="checkbox" id="domoticz_sub"></td>
+    <td><img src="info.png" title="Whether to subscribe to Domoticz commands"/></td>
   </tr>
   <tr>
     <td colspan="2" align="center">
