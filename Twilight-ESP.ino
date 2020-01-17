@@ -18,12 +18,15 @@ ESP8266HTTPUpdateServer httpUpdater;
 DNSServer dnsServer;
 SimpleTimer timers;
 
+#define NETWORK_LEN	33
+#define TOPIC_LEN	65
+
 class config: public Configuration {
 public:
-	char ssid[33];
-	char password[33];
-	char hostname[17];
-	char mqtt_server[33];
+	char ssid[NETWORK_LEN];
+	char password[NETWORK_LEN];
+	char hostname[NETWORK_LEN];
+	char mqtt_server[NETWORK_LEN];
 	long interval_time;
 	long inactive_time;
 	unsigned threshold;
@@ -33,8 +36,12 @@ public:
 	unsigned off_delay;
 	unsigned on_bright;
 	unsigned off_bright;
-	char to_domoticz[65];
-	char from_domoticz[65];
+	char pir_topic[TOPIC_LEN];
+	char pwr_topic[TOPIC_LEN];
+	char light_topic[TOPIC_LEN];
+	char cmnd_topic[TOPIC_LEN];
+	char to_domoticz[TOPIC_LEN];
+	char from_domoticz[TOPIC_LEN];
 	bool domoticz_sub;
 
 	void configure(JsonDocument &o);
@@ -54,6 +61,16 @@ void config::configure(JsonDocument &o) {
 	off_delay = o[F("off_delay")];
 	on_bright = o[F("on_bright")] | 1023;
 	off_bright = o[F("off_bright")] | 0;
+	const char *st = o[F("stat_topic")] | "";
+	if (*st) {
+		strlcpy(pir_topic, st, sizeof(pir_topic));
+		strlcat(pir_topic, "pir", sizeof(pir_topic));
+		strlcpy(pwr_topic, st, sizeof(pwr_topic));
+		strlcat(pwr_topic, "power", sizeof(pwr_topic));
+		strlcpy(light_topic, st, sizeof(light_topic));
+		strlcat(light_topic, "light", sizeof(light_topic));
+	}
+	strlcpy(cmnd_topic, o[F("cmnd_topic")] | "", sizeof(cmnd_topic));
 	strlcpy(to_domoticz, o[F("to_domoticz")] | "", sizeof(to_domoticz));
 	strlcpy(from_domoticz, o[F("from_domoticz")] | "", sizeof(from_domoticz));
 	domoticz_sub = o[F("domoticz_sub")];
@@ -64,17 +81,6 @@ void config::configure(JsonDocument &o) {
 #define POWER	D1
 #define HZ	5
 #define SAMPLES	(15*HZ)
-
-#define CMND	"cmnd/twilight/"
-#define STAT	"stat/twilight/"
-#define PWR	"power"
-#define LIGHT	"light"
-#define STAT_PWR	STAT PWR
-#define STAT_PIR	STAT "pir"
-#define STAT_LIGHT	STAT LIGHT
-#define CMND_ALL	CMND "+"
-#define CMND_PWR	CMND PWR
-#define CMND_LIGHT	CMND LIGHT
 
 static enum State {
 	START = 0,
@@ -112,8 +118,8 @@ static bool mqtt_connect(PubSubClient &c) {
 	if (c.connected())
 		return true;
 	if (c.connect(cfg.hostname)) {
-		c.subscribe(CMND_ALL);
-		if (cfg.domoticz_sub)
+		c.subscribe(cfg.cmnd_topic);
+		if (cfg.domoticz_sub && cfg.switch_idx != -1)
 			c.subscribe(cfg.from_domoticz);
 		return true;
 	}
@@ -202,6 +208,7 @@ void setup() {
 		return;
 	}
 
+	Serial.println(F("--networking--"));
 	Serial.print(F("MAC: "));
 	Serial.println(WiFi.macAddress());
 	Serial.print(F("SSID: "));
@@ -210,18 +217,11 @@ void setup() {
 	Serial.println(cfg.password);
 	Serial.print(F("Hostname: "));
 	Serial.println(cfg.hostname);
-	Serial.print(F("MQTT Server: "));
-	Serial.println(cfg.mqtt_server);
-	Serial.print(F("Threshold: "));
-	Serial.println(cfg.threshold);
-	Serial.print(F("Interval time: "));
-	Serial.println(cfg.interval_time);
+	Serial.println(F("----light-----"));
 	Serial.print(F("Inactive time: "));
 	Serial.println(cfg.inactive_time);
-	Serial.print(F("Switch idx: "));
-	Serial.println(cfg.switch_idx);
-	Serial.print(F("PIR idx: "));
-	Serial.println(cfg.pir_idx);
+	Serial.print(F("Threshold: "));
+	Serial.println(cfg.threshold);
 	Serial.print(F("On delay: "));
 	Serial.println(cfg.on_delay);
 	Serial.print(F("Off delay: "));
@@ -230,6 +230,26 @@ void setup() {
 	Serial.println(cfg.on_bright);
 	Serial.print(F("Off bright: "));
 	Serial.println(cfg.off_bright);
+	Serial.println(F("-----mqtt-----"));
+	Serial.print(F("MQTT Server: "));
+	Serial.println(cfg.mqtt_server);
+	Serial.print(F("Notification time: "));
+	Serial.println(cfg.interval_time);
+	Serial.print(F("Power Topic: "));
+	Serial.println(cfg.pwr_topic);
+	Serial.print(F("PIR Topic: "));
+	Serial.println(cfg.pir_topic);
+	Serial.print(F("Light Topic: "));
+	Serial.println(cfg.light_topic);
+	Serial.print(F("Light Topic: "));
+	Serial.println(cfg.light_topic);
+	Serial.print(F("Command Topic: "));
+	Serial.println(cfg.cmnd_topic);
+	Serial.println(F("---domoticz---"));
+	Serial.print(F("Switch idx: "));
+	Serial.println(cfg.switch_idx);
+	Serial.print(F("PIR idx: "));
+	Serial.println(cfg.pir_idx);
 	Serial.print(F("To Domoticz: "));
 	Serial.println(cfg.to_domoticz);
 	Serial.print(F("From Domoticz: "));
@@ -291,7 +311,7 @@ void setup() {
 
 		mqtt_client.setServer(cfg.mqtt_server, 1883);
 		mqtt_client.setCallback([](char *topic, byte *payload, unsigned int length) {
-			if (strcmp(topic, CMND_PWR) == 0) {
+			if (strcmp(topic, cfg.cmnd_topic) == 0) {
 				activity();
 				bool cmdOn = (*payload == '1');
 				if (cmdOn && isOff())
@@ -328,7 +348,7 @@ void setup() {
 	watchdog = timers.setInterval(cfg.inactive_time, []() { state = AUTO_OFF; });
 	timers.disable(watchdog);
 
-	timers.setInterval(cfg.interval_time, []() { mqtt_pub(STAT_LIGHT, light); });
+	timers.setInterval(cfg.interval_time, []() { mqtt_pub(cfg.light_topic, light); });
 	timers.setInterval(1000 / HZ, sampleLight);
 	sampleLight();
 
@@ -354,7 +374,7 @@ void loop() {
 		activity();
 		if (light > cfg.threshold && isOff())
 			state = AUTO_ON;
-		mqtt_pub(STAT_PIR, pir);
+		mqtt_pub(cfg.pir_topic, pir);
 		domoticz_pub(cfg.pir_idx, pir);
 		pir = false;
 	}
@@ -400,7 +420,7 @@ void loop() {
 	static State last_state = START;
 	if (state != last_state) {
 		last_state = state;
-		mqtt_pub(STAT_PWR, state);
+		mqtt_pub(cfg.pwr_topic, state);
 	}
 	timers.run();
 }

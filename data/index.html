@@ -11,6 +11,7 @@ function load_config() {
     }
     response.json().then(function(data) {
       Transparency.render(document.getElementById('config'), data);
+      chk_domoticz_sub();
     });
   }).catch(function(err) {
     console.log('Fetch error :-S', err);
@@ -33,6 +34,10 @@ function save_config() {
   xhr.setRequestHeader('Content-Type', 'application/json');
   xhr.send(JSON.stringify(data, null, "  "));
 }
+function chk_domoticz_sub() {
+  val = document.getElementById('domoticz_sub').checked;
+  document.getElementById('from_domoticz').disabled = !val;
+}
 </script>
 </head>
 <body onload="load_config()">
@@ -42,87 +47,109 @@ function save_config() {
 <legend>Configuration</legend>
 <table>
   <tr>
-    <td>SSID:</td>
-    <td><input type="text" id="ssid"></td>
+    <td colspan="3" align="center" style="background-color:lightgray">Networking</td>
+  </tr>
+  <tr>
+    <td>SSID</td>
+    <td><input type="text" id="ssid" maxlength="32"></td>
     <td><img src="info.png" title="Your Wifi network name"/></td>
   </tr>
   <tr>
-    <td>Password:</td>
-    <td><input type="text" id="password"></td>
+    <td>Password</td>
+    <td><input type="text" id="password" maxlength="32"></td>
     <td><img src="info.png" title="Your Wifi network password"/></td>
   </tr>
   <tr>
-    <td>Hostname:</td>
-    <td><input type="text" id="hostname"></td>
+    <td>Hostname</td>
+    <td><input type="text" id="hostname" maxlength="32"></td>
     <td><img src="info.png" title="My hostname on your network"/></td>
   </tr>
   <tr>
-    <td>MQTT Server:</td>
-    <td><input type="text" id="mqtt_server"></td>
-    <td><img src="info.png" title="Your MQTT server's hostname"/></td>
+    <td colspan="3" align="center" style="background-color:lightgray">Light Settings</td>
   </tr>
   <tr>
-    <td>Interval Time:</td>
-    <td><input type="number" min=0 id="interval_time"></td>
-    <td><img src="info.png" title="Light sampling interval"/></td>
-  </tr>
-  <tr>
-    <td>Inactive Time:</td>
+    <td>Inactive Time</td>
     <td><input type="number" min=0 id="inactive_time"></td>
-    <td><img src="info.png" title="Time light stays on with no movement"/></td>
+    <td><img src="info.png" title="Time light stays on with no movement (secs)"/></td>
   </tr>
   <tr>
-    <td>Light Threshold:</td>
+    <td>Light Threshold</td>
     <td><input type="number" min=0 max=1023 id="threshold"></td>
-    <td><img src="info.png" title="Level light comes on at"/></td>
+    <td><img src="info.png" title="Level light comes on at (0-1023)"/></td>
   </tr>
   <tr>
-    <td>On delay:</td>
+    <td>On delay</td>
     <td><input type="number" min="0" id="on_delay"></td>
-    <td><img src="info.png" title="Fade-on time"/></td>
+    <td><img src="info.png" title="Fade-on delay (ms)"/></td>
   </tr>
   <tr>
-    <td>Off delay:</td>
+    <td>Off delay</td>
     <td><input type="number" min="0" id="off_delay"></td>
-    <td><img src="info.png" title="Fade-off time"/></td>
+    <td><img src="info.png" title="Fade-off delay (ms)"/></td>
   </tr>
   <tr>
-    <td>On brightness:</td>
+    <td>On brightness</td>
     <td><input type="number" min="0" max=1023 id="on_bright"></td>
     <td><img src="info.png" title="Brightness when on (usually max: 1023)"/></td>
   </tr>
   <tr>
-    <td>Off brightness:</td>
+    <td>Off brightness</td>
     <td><input type="number" min="0" max=1023 id="off_bright"></td>
     <td><img src="info.png" title="Brightness when off (usually min: 0)"/></td>
   </tr>
   <tr>
-    <td>Switch Index:</td>
+    <td colspan="3" align="center" style="background-color:lightgray">MQTT Settings</td>
+  </tr>
+  <tr>
+    <td>MQTT Server</td>
+    <td><input type="text" id="mqtt_server" maxlength="32"></td>
+    <td><img src="info.png" title="Your MQTT server's hostname"/></td>
+  </tr>
+  <tr>
+    <td>Light Notification Time</td>
+    <td><input type="number" min=0 id="interval_time"></td>
+    <td><img src="info.png" title="Light status topic notification interval (secs)"/></td>
+  </tr>
+  <tr>
+    <td>Status Prefix</td>
+    <td><input type="text" id="stat_topic" maxlength="64"></td>
+    <td><img src="info.png" title="MQTT status topic prefix (suffixes: pir, power, light)"/></td>
+  </tr>
+  <tr>
+    <td>Command Topic</td>
+    <td><input type="text" id="cmnd_topic" maxlength="64"></td>
+    <td><img src="info.png" title="MQTT command topic (on/off)"/></td>
+  </tr>
+  <tr>
+    <td colspan="3" align="center" style="background-color:lightgray">Domoticz</td>
+  </tr>
+  <tr>
+    <td>Switch Index</td>
     <td><input type="number" min="-1" id="switch_idx"></td>
     <td><img src="info.png" title="Domoticz index of Switch device"/></td>
   </tr>
   <tr>
-    <td>PIR Index:</td>
+    <td>PIR Index</td>
     <td><input type="number" min="-1" id="pir_idx"></td>
     <td><img src="info.png" title="Domoticz index of PIR device"/></td>
   </tr>
   <tr>
-    <td>To Domoticz:</td>
-    <td><input type="text" id="to_domoticz"></td>
+    <td>Status Topic</td>
+    <td><input type="text" id="to_domoticz" maxlength="64"></td>
     <td><img src="info.png" title="MQTT topic for Domoticz notifications"/></td>
   </tr>
   <tr>
-    <td>From Domoticz:</td>
-    <td><input type="text" id="from_domoticz"></td>
+    <td>Command Topic</td>
+    <td><input type="text" id="from_domoticz" maxlength="64"></td>
     <td><img src="info.png" title="MQTT topic for Domoticz commands"/></td>
   </tr>
   <tr>
-    <td>Subscribe to Domoticz:</td>
-    <td><input type="checkbox" id="domoticz_sub"></td>
+    <td>Subscribe to commands</td>
+    <td><input type="checkbox" id="domoticz_sub" onclick="chk_domoticz_sub()"></td>
     <td><img src="info.png" title="Whether to subscribe to Domoticz commands"/></td>
   </tr>
   <tr>
-    <td colspan="2" align="center">
+    <td colspan="3" align="center" style="background-color:lightgray">
       <button type="submit" onclick="save_config()">Update</button>
     </td>
   </tr>
@@ -139,8 +166,8 @@ function save_config() {
     <td><input name="image" type="file" accept=".ino.bin"/></td>
   </tr>
   <tr>
-    <td colspan="2" align="center">
-      <input type="submit" value="Upgrade"/>
+    <td colspan="2" align="center" style="background-color:lightgray">
+    <input type="submit" value="Upgrade"/>
     </td>
   </tr>
 </table>
