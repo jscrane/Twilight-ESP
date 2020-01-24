@@ -102,7 +102,7 @@ inline bool isOn() {
 	return state == ON || state == AUTO_ON || state == MQTT_ON || state == DOMOTICZ_ON;
 }
 
-static bool connected;
+static bool connected, connecting;
 
 static void flash(int pin, int ms, int n) {
 	bool v = digitalRead(pin);
@@ -114,39 +114,6 @@ static void flash(int pin, int ms, int n) {
 	}
 }
 
-static bool mqtt_connect(PubSubClient &c) {
-	if (c.connected())
-		return true;
-	if (c.connect(cfg.hostname)) {
-		c.subscribe(cfg.cmnd_topic);
-		if (cfg.domoticz_sub && cfg.switch_idx != -1)
-			c.subscribe(cfg.from_domoticz);
-		return true;
-	}
-	Serial.print(F("MQTT connection to: "));
-	Serial.print(cfg.mqtt_server);
-	Serial.print(F(" failed, rc="));
-	Serial.println(mqtt_client.state());
-	flash(PIR_LED, 100, 2);
-	return false;
-}
-
-static void mqtt_pub(const char *topic, int val) {
-	if (mqtt_connect(mqtt_client)) {
-		char msg[16];
-		snprintf(msg, sizeof(msg), "%d", val);
-		mqtt_client.publish(topic, msg);
-	}
-}
-
-static void domoticz_pub(int idx, int val) {
-	if (idx != -1 && mqtt_connect(mqtt_client)) {
-		char msg[64];
-		snprintf(msg, sizeof(msg), "{\"idx\":%d,\"nvalue\":%d,\"svalue\":\"\"}", idx, val);
-		mqtt_client.publish(cfg.to_domoticz, msg);
-	}
-}
-
 static volatile bool pir;
 
 void ICACHE_RAM_ATTR pir_handler() { pir = true; }
@@ -154,7 +121,7 @@ void ICACHE_RAM_ATTR pir_handler() { pir = true; }
 // timers
 static unsigned light;
 static unsigned fade;
-static int watchdog, flasher, poller;
+static int watchdog, flasher, poller, connector;
 static int fadeOn, fadeOff;
 
 static void sampleLight() {
@@ -183,6 +150,107 @@ static void fade_off() {
 static void fade_on() {
 	if (fade < cfg.on_bright)
 		analogWrite(POWER, ++fade);
+}
+
+static void captive_portal() {
+	WiFi.softAP(cfg.hostname);
+	Serial.print(F("Connect to SSID: "));
+	Serial.print(cfg.hostname);
+	Serial.println(F(" to configure WIFI"));
+	dnsServer.start(53, "*", WiFi.softAPIP());
+}
+
+static void flash_connecting() {
+	static int i;
+	const char s[] = "|/-\\";
+
+	connected = WiFi.status() == WL_CONNECTED;
+	if (i < 240 && !connected) {
+		digitalWrite(PIR_LED, !digitalRead(PIR_LED));
+		Serial.print(s[i % 4]);
+		Serial.print('\r');
+		i++;
+		return;
+	}
+	Serial.println();
+	connecting = false;
+
+	if (connected) {
+		Serial.print(F("Connected to "));
+		Serial.println(cfg.ssid);
+		Serial.println(WiFi.localIP());
+
+		if (mdns.begin(cfg.hostname, WiFi.localIP())) {
+			Serial.println(F("mDNS started"));
+			mdns.addService("http", "tcp", 80);
+		} else
+			Serial.println(F("Error starting MDNS"));
+
+		flash(POWER, 250, 2);
+		return;
+	}
+
+	captive_portal();
+}
+
+static bool mqtt_connect(PubSubClient &c) {
+	if (!connected)
+		return false;
+	if (c.connected())
+		return true;
+	if (c.connect(cfg.hostname)) {
+		c.subscribe(cfg.cmnd_topic);
+		if (cfg.domoticz_sub && cfg.switch_idx != -1)
+			c.subscribe(cfg.from_domoticz);
+		return true;
+	}
+	Serial.print(F("MQTT connection to: "));
+	Serial.print(cfg.mqtt_server);
+	Serial.print(F(" failed, rc="));
+	Serial.println(mqtt_client.state());
+	flash(PIR_LED, 100, 2);
+	return false;
+}
+
+static void mqtt_pub(const char *topic, int val) {
+	if (*topic && mqtt_connect(mqtt_client)) {
+		char msg[16];
+		snprintf(msg, sizeof(msg), "%d", val);
+		mqtt_client.publish(topic, msg);
+	}
+}
+
+static void domoticz_pub(int idx, int val) {
+	if (idx != -1 && mqtt_connect(mqtt_client)) {
+		char msg[64];
+		snprintf(msg, sizeof(msg), "{\"idx\":%d,\"nvalue\":%d,\"svalue\":\"\"}", idx, val);
+		mqtt_client.publish(cfg.to_domoticz, msg);
+	}
+}
+
+static void mqtt_callback(char *topic, byte *payload, unsigned int length) {
+	if (strcmp(topic, cfg.cmnd_topic) == 0) {
+		activity();
+		bool cmdOn = (*payload == '1');
+		if (cmdOn && isOff())
+			state = MQTT_ON;
+		else if (!cmdOn && isOn())
+			state = MQTT_OFF;
+	} else if (strcmp(topic, cfg.from_domoticz) == 0) {
+		DynamicJsonDocument doc(JSON_OBJECT_SIZE(16) + 500);
+		auto error = deserializeJson(doc, payload);
+		if (error)
+			return;
+		int idx = doc[F("idx")] | -1;
+		if (idx == cfg.switch_idx) {
+			activity();
+			int v = doc[F("nvalue")] | -1;
+			if (v == 1 && isOff())
+				state = DOMOTICZ_ON;
+			else if (v == 0 && isOn())
+				state = DOMOTICZ_OFF;
+		}
+	}
 }
 
 void setup() {
@@ -262,15 +330,9 @@ void setup() {
 	if (*cfg.ssid) {
 		WiFi.setAutoReconnect(true);
 		WiFi.begin(cfg.ssid, cfg.password);
-		const char s[] = "|/-\\";
-		for (int i = 0; i < 120 && WiFi.status() != WL_CONNECTED; i++) {
-			flash(PIR_LED, 250, 1);
-			Serial.print(s[i % 4]);
-			Serial.print('\r');
-		}
-		Serial.println();
-		connected = WiFi.status() == WL_CONNECTED;
-	}
+		connecting = true;
+	} else
+		captive_portal();
 
 	server.on("/config", HTTP_POST, []() {
 		if (server.hasArg("plain")) {
@@ -291,50 +353,9 @@ void setup() {
 	httpUpdater.setup(&server);
 	server.begin();
 
-	if (mdns.begin(cfg.hostname, WiFi.localIP())) {
-		Serial.println(F("mDNS started"));
-		mdns.addService("http", "tcp", 80);
-	} else
-		Serial.println(F("Error starting MDNS"));
+	mqtt_client.setServer(cfg.mqtt_server, 1883);
+	mqtt_client.setCallback(mqtt_callback);
 
-	if (!connected) {
-		WiFi.softAP(cfg.hostname);
-		Serial.print(F("Connect to SSID: "));
-		Serial.print(cfg.hostname);
-		Serial.println(F(" to configure WIFI"));
-		dnsServer.start(53, "*", WiFi.softAPIP());
-	} else {
-		Serial.print(F("Connected to "));
-		Serial.println(cfg.ssid);
-		Serial.println(WiFi.localIP());
-		flash(POWER, 250, 2);
-
-		mqtt_client.setServer(cfg.mqtt_server, 1883);
-		mqtt_client.setCallback([](char *topic, byte *payload, unsigned int length) {
-			if (strcmp(topic, cfg.cmnd_topic) == 0) {
-				activity();
-				bool cmdOn = (*payload == '1');
-				if (cmdOn && isOff())
-					state = MQTT_ON;
-				else if (!cmdOn && isOn())
-					state = MQTT_OFF;
-			} else if (strcmp(topic, cfg.from_domoticz) == 0) {
-				DynamicJsonDocument doc(JSON_OBJECT_SIZE(16) + 500);
-				auto error = deserializeJson(doc, payload);
-				if (error)
-					return;
-				int idx = doc[F("idx")] | -1;
-				if (idx == cfg.switch_idx) {
-					activity();
-					int v = doc[F("nvalue")] | -1;
-					if (v == 1 && isOff())
-						state = DOMOTICZ_ON;
-					else if (v == 0 && isOn())
-						state = DOMOTICZ_OFF;
-				}
-			}
-		});
-	}
 	digitalWrite(POWER, LOW);
 	digitalWrite(PIR_LED, HIGH);
 	attachInterrupt(PIR, pir_handler, RISING);
@@ -352,6 +373,7 @@ void setup() {
 	timers.setInterval(1000 / HZ, sampleLight);
 	sampleLight();
 
+	connector = timers.setInterval(250, flash_connecting);
 	flasher = timers.setInterval(1000, []() { digitalWrite(PIR_LED, !digitalRead(PIR_LED)); });
 	poller = timers.setInterval(100, []() { mqtt_client.loop(); });
 }
@@ -363,11 +385,15 @@ void loop() {
 	if (connected) {
 		digitalWrite(PIR_LED, !pir);
 		timers.disable(flasher);
+		timers.disable(connector);
 		timers.enable(poller);
-	} else {
+	} else if (connecting)
+		timers.enable(connector);
+	else {
 		dnsServer.processNextRequest();
 		timers.enable(flasher);
 		timers.disable(poller);
+		timers.disable(connector);
 	}
 
 	if (pir) {
