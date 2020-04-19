@@ -56,7 +56,7 @@ function chk_domoticz_sub() {
   </tr>
   <tr>
     <td>Password</td>
-    <td><input type="text" id="password" maxlength="32"></td>
+    <td><input type="password" id="password" maxlength="32"></td>
     <td><img src="info.png" title="Your Wifi network password"/></td>
   </tr>
   <tr>
@@ -119,6 +119,11 @@ function chk_domoticz_sub() {
     <td>Command Topic</td>
     <td><input type="text" id="cmnd_topic" maxlength="64"></td>
     <td><img src="info.png" title="MQTT command topic (on/off)"/></td>
+  </tr>
+  <tr>
+    <td>Debug</td>
+    <td><input type="checkbox" id="debug"></td>
+    <td><img src="info.png" title="whether to send debugging info on 'debug' topic"/></td>
   </tr>
   <tr>
     <td colspan="3" align="center" style="background-color:lightgray">Domoticz</td>

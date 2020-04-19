@@ -2,7 +2,7 @@
  "ssid": "",
  "password": "",
  "hostname": "Twilight",
- "mqtt_server": "iot.lan",
+ "mqtt_server": "iot",
  "inactive_time": 300,
  "threshold": 750,
  "switch_idx": -1,
@@ -16,5 +16,6 @@
  "cmnd_topic": "cmnd/twilight/power",
  "to_domoticz": "domoticz/in",
  "from_domoticz": "domoticz/out",
+ "debug": 1,
  "domoticz_sub": 0
 }

@@ -39,10 +39,11 @@ public:
 	char pir_topic[TOPIC_LEN];
 	char pwr_topic[TOPIC_LEN];
 	char light_topic[TOPIC_LEN];
+	char debug_topic[TOPIC_LEN];
 	char cmnd_topic[TOPIC_LEN];
 	char to_domoticz[TOPIC_LEN];
 	char from_domoticz[TOPIC_LEN];
-	bool domoticz_sub;
+	bool domoticz_sub, debug;
 
 	void configure(JsonDocument &o);
 } cfg;
@@ -69,11 +70,14 @@ void config::configure(JsonDocument &o) {
 		strlcat(pwr_topic, "power", sizeof(pwr_topic));
 		strlcpy(light_topic, st, sizeof(light_topic));
 		strlcat(light_topic, "light", sizeof(light_topic));
+		strlcpy(debug_topic, st, sizeof(light_topic));
+		strlcat(debug_topic, "debug", sizeof(debug_topic));
 	}
 	strlcpy(cmnd_topic, o[F("cmnd_topic")] | "", sizeof(cmnd_topic));
 	strlcpy(to_domoticz, o[F("to_domoticz")] | "", sizeof(to_domoticz));
 	strlcpy(from_domoticz, o[F("from_domoticz")] | "", sizeof(from_domoticz));
 	domoticz_sub = o[F("domoticz_sub")];
+	debug = o[F("debug")];
 }
 
 #define PIR	D2
@@ -212,19 +216,30 @@ static bool mqtt_connect(PubSubClient &c) {
 	return false;
 }
 
-static void mqtt_pub(const char *topic, int val) {
+static void mqtt_pub(const char *topic, const char *fmt, ...) {
 	if (*topic && mqtt_connect(mqtt_client)) {
-		char msg[16];
-		snprintf(msg, sizeof(msg), "%d", val);
+		char msg[64];
+		va_list args;
+		va_start(args, fmt);
+		vsnprintf(msg, sizeof(msg), fmt, args);
 		mqtt_client.publish(topic, msg);
+		va_end(args);
 	}
 }
 
 static void domoticz_pub(int idx, int val) {
-	if (idx != -1 && mqtt_connect(mqtt_client)) {
+	if (idx != -1)
+		mqtt_pub(cfg.to_domoticz, "{\"idx\":%d,\"nvalue\":%d,\"svalue\":\"\"}", idx, val);
+}
+
+static void mqtt_debug(const char *fmt, ...) {
+	if (cfg.debug && mqtt_connect(mqtt_client)) {
 		char msg[64];
-		snprintf(msg, sizeof(msg), "{\"idx\":%d,\"nvalue\":%d,\"svalue\":\"\"}", idx, val);
-		mqtt_client.publish(cfg.to_domoticz, msg);
+		va_list args;
+		va_start(args, fmt);
+		vsnprintf(msg, sizeof(msg), fmt, args);
+		mqtt_client.publish(cfg.debug_topic, msg);
+		va_end(args);
 	}
 }
 
@@ -309,10 +324,12 @@ void setup() {
 	Serial.println(cfg.pir_topic);
 	Serial.print(F("Light Topic: "));
 	Serial.println(cfg.light_topic);
-	Serial.print(F("Light Topic: "));
-	Serial.println(cfg.light_topic);
 	Serial.print(F("Command Topic: "));
 	Serial.println(cfg.cmnd_topic);
+	Serial.print(F("Debug Topic: "));
+	Serial.println(cfg.debug_topic);
+	Serial.print(F("Debugging: "));
+	Serial.println(cfg.debug);
 	Serial.println(F("---domoticz---"));
 	Serial.print(F("Switch idx: "));
 	Serial.println(cfg.switch_idx);
@@ -369,7 +386,10 @@ void setup() {
 	watchdog = timers.setInterval(cfg.inactive_time, []() { state = AUTO_OFF; });
 	timers.disable(watchdog);
 
-	timers.setInterval(cfg.interval_time, []() { mqtt_pub(cfg.light_topic, light); });
+	timers.setInterval(cfg.interval_time, []() {
+		mqtt_pub(cfg.light_topic, "%d", light);
+		mqtt_debug("%d %d %d", fade, cfg.off_bright, cfg.on_bright);
+	});
 	timers.setInterval(1000 / HZ, sampleLight);
 	sampleLight();
 
@@ -400,7 +420,7 @@ void loop() {
 		activity();
 		if (light > cfg.threshold && isOff())
 			state = AUTO_ON;
-		mqtt_pub(cfg.pir_topic, pir);
+		mqtt_pub(cfg.pir_topic, "%d", pir);
 		domoticz_pub(cfg.pir_idx, pir);
 		pir = false;
 	}
@@ -410,15 +430,15 @@ void loop() {
 		fade = cfg.off_bright;
 		break;
 	case OFF:
-		analogWrite(POWER, fade);
+		analogWrite(POWER, cfg.off_bright);
 		break;
 	case AUTO_OFF:
 	case MQTT_OFF:
 	case DOMOTICZ_OFF:
 		timers.disable(fadeOn);
-		if (fade == cfg.on_bright)
+		if (fade >= cfg.on_bright)
 			timers.enable(fadeOff);
-		else if (fade == cfg.off_bright) {
+		else if (fade <= cfg.off_bright) {
 			timers.disable(fadeOff);
 			timers.disable(watchdog);
 			domoticz_pub(cfg.switch_idx, false);
@@ -426,14 +446,15 @@ void loop() {
 		}
 		break;
 	case ON:
+		analogWrite(POWER, cfg.on_bright);
 		break;
 	case AUTO_ON:
 	case MQTT_ON:
 	case DOMOTICZ_ON:
 		timers.disable(fadeOff);
-		if (fade == cfg.off_bright)
+		if (fade <= cfg.off_bright)
 			timers.enable(fadeOn);
-		else if (fade == cfg.on_bright) {
+		else if (fade >= cfg.on_bright) {
 			timers.disable(fadeOn);
 			timers.enable(watchdog);
 			timers.restartTimer(watchdog);
@@ -446,7 +467,7 @@ void loop() {
 	static State last_state = START;
 	if (state != last_state) {
 		last_state = state;
-		mqtt_pub(cfg.pwr_topic, state);
+		mqtt_pub(cfg.pwr_topic, "%d", state);
 	}
 	timers.run();
 }
