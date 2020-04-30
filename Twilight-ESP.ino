@@ -36,10 +36,7 @@ public:
 	unsigned off_delay;
 	unsigned on_bright;
 	unsigned off_bright;
-	char pir_topic[TOPIC_LEN];
-	char pwr_topic[TOPIC_LEN];
-	char light_topic[TOPIC_LEN];
-	char debug_topic[TOPIC_LEN];
+	char stat_topic[TOPIC_LEN];
 	char cmnd_topic[TOPIC_LEN];
 	char to_domoticz[TOPIC_LEN];
 	char from_domoticz[TOPIC_LEN];
@@ -62,17 +59,7 @@ void config::configure(JsonDocument &o) {
 	off_delay = o[F("off_delay")];
 	on_bright = o[F("on_bright")] | 1023;
 	off_bright = o[F("off_bright")] | 0;
-	const char *st = o[F("stat_topic")] | "";
-	if (*st) {
-		strlcpy(pir_topic, st, sizeof(pir_topic));
-		strncat_P(pir_topic, PSTR("pir"), sizeof(pir_topic));
-		strlcpy(pwr_topic, st, sizeof(pwr_topic));
-		strncat_P(pwr_topic, PSTR("power"), sizeof(pwr_topic));
-		strlcpy(light_topic, st, sizeof(light_topic));
-		strncat_P(light_topic, PSTR("light"), sizeof(light_topic));
-		strlcpy(debug_topic, st, sizeof(light_topic));
-		strncat_P(debug_topic, PSTR("debug"), sizeof(debug_topic));
-	}
+	strlcpy(stat_topic, o[F("stat_topic")] | "", sizeof(stat_topic));
 	strlcpy(cmnd_topic, o[F("cmnd_topic")] | "", sizeof(cmnd_topic));
 	strlcpy(to_domoticz, o[F("to_domoticz")] | "", sizeof(to_domoticz));
 	strlcpy(from_domoticz, o[F("from_domoticz")] | "", sizeof(from_domoticz));
@@ -125,7 +112,7 @@ void ICACHE_RAM_ATTR pir_handler() { pir = true; }
 // timers
 static unsigned light;
 static unsigned fade;
-static int watchdog, flasher, poller, connector;
+static int watchdog, flasher, poller, connector, debugger;
 static int fadeOn, fadeOff;
 
 static void sampleLight() {
@@ -156,6 +143,16 @@ static void fade_on() {
 		analogWrite(POWER, ++fade);
 }
 
+const bool retain = true, dont_retain = false;
+
+static void mqtt_pub(bool ret, const char *parent, const char *child, const char *fmt, ...);
+
+static void debug() {
+	uint32_t now = millis() / 1000;
+	mqtt_pub(retain, cfg.stat_topic, PSTR("mem"), PSTR("%d: %d/%d/%d"), now, ESP.getFreeHeap(), ESP.getHeapFragmentation(), ESP.getMaxFreeBlockSize());
+	mqtt_pub(retain, cfg.stat_topic, PSTR("state"), PSTR("%d: %d %d %d"), now, fade, cfg.off_bright, cfg.on_bright);
+}
+
 static void captive_portal() {
 	WiFi.softAP(cfg.hostname);
 	Serial.print(F("Connect to SSID: "));
@@ -163,8 +160,6 @@ static void captive_portal() {
 	Serial.println(F(" to configure WIFI"));
 	dnsServer.start(53, "*", WiFi.softAPIP());
 }
-
-static void mqtt_debug(const char *topic, const char *fmt, ...);
 
 static void flash_connecting() {
 	static int i;
@@ -192,7 +187,10 @@ static void flash_connecting() {
 		} else
 			Serial.println(F("Error starting MDNS"));
 
-		mqtt_debug(PSTR("restart"), ESP.getResetInfo().c_str());
+		if (cfg.debug) {
+			mqtt_pub(retain, cfg.stat_topic, PSTR("restart"), ESP.getResetInfo().c_str());
+			debugger = timers.setInterval(cfg.interval_time, debug);
+		}
 
 		flash(POWER, 250, 2);
 		return;
@@ -220,30 +218,22 @@ static bool mqtt_connect(PubSubClient &c) {
 	return false;
 }
 
-static void mqtt_pub(const char *topic, const char *fmt, ...) {
-	if (*topic && mqtt_connect(mqtt_client)) {
+static void domoticz_pub(int idx, int val) {
+	if (idx != -1 && *cfg.to_domoticz && mqtt_connect(mqtt_client)) {
 		char msg[64];
-		va_list args;
-		va_start(args, fmt);
-		vsnprintf_P(msg, sizeof(msg), fmt, args);
-		mqtt_client.publish(topic, msg);
-		va_end(args);
+		snprintf_P(msg, sizeof(msg), PSTR("{\"idx\":%d,\"nvalue\":%d,\"svalue\":\"\"}"), idx, val);
+		mqtt_client.publish(cfg.to_domoticz, msg);
 	}
 }
 
-static void domoticz_pub(int idx, int val) {
-	if (idx != -1)
-		mqtt_pub(cfg.to_domoticz, PSTR("{\"idx\":%d,\"nvalue\":%d,\"svalue\":\"\"}"), idx, val);
-}
-
-static void mqtt_debug(const char *t, const char *fmt, ...) {
-	if (cfg.debug && mqtt_connect(mqtt_client)) {
+static void mqtt_pub(bool ret, const char *parent, const char *child, const char *fmt, ...) {
+	if (mqtt_connect(mqtt_client)) {
 		char msg[64], topic[TOPIC_LEN];
-		snprintf_P(topic, sizeof(topic), PSTR("%s/%s"), cfg.debug_topic, t);
+		snprintf_P(topic, sizeof(topic), PSTR("%s/%s"), parent, child);
 		va_list args;
 		va_start(args, fmt);
 		vsnprintf_P(msg, sizeof(msg), fmt, args);
-		mqtt_client.publish(topic, msg, true);
+		mqtt_client.publish(topic, msg, ret);
 		va_end(args);
 	}
 }
@@ -322,16 +312,6 @@ void setup() {
 	Serial.println(cfg.mqtt_server);
 	Serial.print(F("Notification time: "));
 	Serial.println(cfg.interval_time);
-	Serial.print(F("Power Topic: "));
-	Serial.println(cfg.pwr_topic);
-	Serial.print(F("PIR Topic: "));
-	Serial.println(cfg.pir_topic);
-	Serial.print(F("Light Topic: "));
-	Serial.println(cfg.light_topic);
-	Serial.print(F("Command Topic: "));
-	Serial.println(cfg.cmnd_topic);
-	Serial.print(F("Debug Topic: "));
-	Serial.println(cfg.debug_topic);
 	Serial.print(F("Debugging: "));
 	Serial.println(cfg.debug);
 	Serial.println(F("---domoticz---"));
@@ -391,10 +371,7 @@ void setup() {
 	timers.disable(watchdog);
 
 	timers.setInterval(cfg.interval_time, []() {
-		mqtt_pub(cfg.light_topic, PSTR("%d"), light);
-		uint32_t now = millis() / 1000;
-		mqtt_debug(PSTR("mem"), PSTR("%d: %d/%d/%d"), now, ESP.getFreeHeap(), ESP.getHeapFragmentation(), ESP.getMaxFreeBlockSize());
-		mqtt_debug(PSTR("state"), PSTR("%d: %d %d %d"), now, fade, cfg.off_bright, cfg.on_bright);
+		mqtt_pub(dont_retain, cfg.stat_topic, PSTR("light"), PSTR("%d"), light);
 	});
 	timers.setInterval(1000 / HZ, sampleLight);
 	sampleLight();
@@ -426,7 +403,7 @@ void loop() {
 		activity();
 		if (light > cfg.threshold && isOff())
 			state = AUTO_ON;
-		mqtt_pub(cfg.pir_topic, PSTR("%d"), pir);
+		mqtt_pub(dont_retain, cfg.stat_topic, PSTR("pir"), PSTR("%d"), pir);
 		domoticz_pub(cfg.pir_idx, pir);
 		pir = false;
 	}
@@ -473,7 +450,7 @@ void loop() {
 	static State last_state = START;
 	if (state != last_state) {
 		last_state = state;
-		mqtt_pub(cfg.pwr_topic, PSTR("%d"), state);
+		mqtt_pub(dont_retain, cfg.stat_topic, PSTR("power"), PSTR("%d"), state);
 	}
 	timers.run();
 }

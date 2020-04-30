@@ -12,7 +12,7 @@
  "on_bright": 1023,
  "off_bright": 0,
  "interval_time": 10,
- "stat_topic": "stat/twilight/",
+ "stat_topic": "stat/twilight",
  "cmnd_topic": "cmnd/twilight/power",
  "to_domoticz": "domoticz/in",
  "from_domoticz": "domoticz/out",
