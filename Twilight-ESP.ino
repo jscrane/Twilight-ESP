@@ -148,8 +148,8 @@ const bool retain = true, dont_retain = false;
 static void mqtt_pub(bool ret, const char *parent, const char *child, const char *fmt, ...);
 
 static void debug() {
-	uint32_t secs = millis() / 1000, mins = (secs / 60) % 60, hours = (mins / 60) % 24, days = hours / 24;
-	mqtt_pub(retain, cfg.stat_topic, PSTR("uptime"), PSTR("%d %d days %02d:%02d"), secs, days, hours, mins);
+	uint32_t secs = millis() / 1000, mins = secs / 60, hours = mins / 60, days = hours / 24;
+	mqtt_pub(retain, cfg.stat_topic, PSTR("uptime"), PSTR("%d %d days %02d:%02d"), secs, days, (hours % 24), (mins % 60));
 	mqtt_pub(retain, cfg.stat_topic, PSTR("mem"), PSTR("%d/%d/%d"), ESP.getFreeHeap(), ESP.getHeapFragmentation(), ESP.getMaxFreeBlockSize());
 	mqtt_pub(retain, cfg.stat_topic, PSTR("state"), PSTR("%d %d %d"), fade, cfg.off_bright, cfg.on_bright);
 }
@@ -223,7 +223,7 @@ static void domoticz_pub(int idx, int val) {
 	if (idx != -1 && *cfg.to_domoticz && mqtt_connect(mqtt_client)) {
 		char msg[64];
 		snprintf_P(msg, sizeof(msg), PSTR("{\"idx\":%d,\"nvalue\":%d,\"svalue\":\"\"}"), idx, val);
-		mqtt_client.publish(cfg.to_domoticz, msg);
+		mqtt_client.publish(cfg.to_domoticz, msg, retain);
 	}
 }
 
@@ -451,7 +451,7 @@ void loop() {
 	static State last_state = START;
 	if (state != last_state) {
 		last_state = state;
-		mqtt_pub(dont_retain, cfg.stat_topic, PSTR("power"), PSTR("%d"), state);
+		mqtt_pub(retain, cfg.stat_topic, PSTR("power"), PSTR("%d"), state);
 	}
 	timers.run();
 }
