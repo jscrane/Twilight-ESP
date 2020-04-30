@@ -148,9 +148,10 @@ const bool retain = true, dont_retain = false;
 static void mqtt_pub(bool ret, const char *parent, const char *child, const char *fmt, ...);
 
 static void debug() {
-	uint32_t now = millis() / 1000;
-	mqtt_pub(retain, cfg.stat_topic, PSTR("mem"), PSTR("%d: %d/%d/%d"), now, ESP.getFreeHeap(), ESP.getHeapFragmentation(), ESP.getMaxFreeBlockSize());
-	mqtt_pub(retain, cfg.stat_topic, PSTR("state"), PSTR("%d: %d %d %d"), now, fade, cfg.off_bright, cfg.on_bright);
+	uint32_t secs = millis() / 1000, mins = (secs / 60) % 60, hours = (mins / 60) % 24, days = hours / 24;
+	mqtt_pub(retain, cfg.stat_topic, PSTR("uptime"), PSTR("%d %d days %02d:%02d"), secs, days, hours, mins);
+	mqtt_pub(retain, cfg.stat_topic, PSTR("mem"), PSTR("%d/%d/%d"), ESP.getFreeHeap(), ESP.getHeapFragmentation(), ESP.getMaxFreeBlockSize());
+	mqtt_pub(retain, cfg.stat_topic, PSTR("state"), PSTR("%d %d %d"), fade, cfg.off_bright, cfg.on_bright);
 }
 
 static void captive_portal() {
