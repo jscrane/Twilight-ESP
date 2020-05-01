@@ -17,55 +17,7 @@ ESP8266WebServer server(80);
 ESP8266HTTPUpdateServer httpUpdater;
 DNSServer dnsServer;
 SimpleTimer timers;
-
-#define NETWORK_LEN	33
-#define TOPIC_LEN	65
-
-class config: public Configuration {
-public:
-	char ssid[NETWORK_LEN];
-	char password[NETWORK_LEN];
-	char hostname[NETWORK_LEN];
-	char mqtt_server[NETWORK_LEN];
-	long interval_time;
-	long inactive_time;
-	unsigned threshold;
-	int switch_idx;
-	int pir_idx;
-	unsigned on_delay;
-	unsigned off_delay;
-	unsigned on_bright;
-	unsigned off_bright;
-	char stat_topic[TOPIC_LEN];
-	char cmnd_topic[TOPIC_LEN];
-	char to_domoticz[TOPIC_LEN];
-	char from_domoticz[TOPIC_LEN];
-	bool domoticz_sub, debug;
-
-	void configure(JsonDocument &o);
-} cfg;
-
-void config::configure(JsonDocument &o) {
-	strlcpy(ssid, o[F("ssid")] | "", sizeof(ssid));
-	strlcpy(password, o[F("password")] | "", sizeof(password));
-	strlcpy(hostname, o[F("hostname")] | "", sizeof(hostname));
-	strlcpy(mqtt_server, o[F("mqtt_server")] | "", sizeof(mqtt_server));
-	interval_time = 1000 * (long)o[F("interval_time")];
-	inactive_time = 1000 * (long)o[F("inactive_time")];
-	threshold = o[F("threshold")];
-	switch_idx = o[F("switch_idx")];
-	pir_idx = o[F("pir_idx")];
-	on_delay = o[F("on_delay")];
-	off_delay = o[F("off_delay")];
-	on_bright = o[F("on_bright")] | 1023;
-	off_bright = o[F("off_bright")] | 0;
-	strlcpy(stat_topic, o[F("stat_topic")] | "", sizeof(stat_topic));
-	strlcpy(cmnd_topic, o[F("cmnd_topic")] | "", sizeof(cmnd_topic));
-	strlcpy(to_domoticz, o[F("to_domoticz")] | "", sizeof(to_domoticz));
-	strlcpy(from_domoticz, o[F("from_domoticz")] | "", sizeof(from_domoticz));
-	domoticz_sub = o[F("domoticz_sub")];
-	debug = o[F("debug")];
-}
+config cfg;
 
 #define PIR	D2
 #define PIR_LED	D4
@@ -74,15 +26,15 @@ void config::configure(JsonDocument &o) {
 #define SAMPLES	(15*HZ)
 
 static enum State {
-	START = 0,
-	OFF = 1,
-	ON = 2,
-	AUTO_OFF = 3,
-	AUTO_ON = 4,
-	MQTT_OFF = 5,
-	MQTT_ON = 6,
-	DOMOTICZ_OFF = 7,
-	DOMOTICZ_ON = 8
+	START = -1,
+	OFF = 0,
+	ON = 1,
+	AUTO_OFF = 2,
+	AUTO_ON = 3,
+	MQTT_OFF = 4,
+	MQTT_ON = 5,
+	DOMOTICZ_OFF = 6,
+	DOMOTICZ_ON = 7
 } state;
 
 inline bool isOff() {
@@ -151,7 +103,7 @@ static void debug() {
 	uint32_t secs = millis() / 1000, mins = secs / 60, hours = mins / 60, days = hours / 24;
 	mqtt_pub(retain, cfg.stat_topic, PSTR("uptime"), PSTR("%d %d days %02d:%02d"), secs, days, (hours % 24), (mins % 60));
 	mqtt_pub(retain, cfg.stat_topic, PSTR("mem"), PSTR("%d/%d/%d"), ESP.getFreeHeap(), ESP.getHeapFragmentation(), ESP.getMaxFreeBlockSize());
-	mqtt_pub(retain, cfg.stat_topic, PSTR("state"), PSTR("%d %d %d"), fade, cfg.off_bright, cfg.on_bright);
+	mqtt_pub(retain, cfg.stat_topic, PSTR("fade"), PSTR("%d %d %d"), fade, cfg.off_bright, cfg.on_bright);
 }
 
 static void captive_portal() {
@@ -451,7 +403,7 @@ void loop() {
 	static State last_state = START;
 	if (state != last_state) {
 		last_state = state;
-		mqtt_pub(retain, cfg.stat_topic, PSTR("power"), PSTR("%d"), state);
+		mqtt_pub(retain, cfg.stat_topic, PSTR("state"), PSTR("%d"), state);
 	}
 	timers.run();
 }
