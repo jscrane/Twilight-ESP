@@ -113,7 +113,7 @@ function chk_domoticz_sub() {
   <tr>
     <td>Status Prefix</td>
     <td><input type="text" id="stat_topic" maxlength="64"></td>
-    <td><img src="info.png" title="MQTT status topic prefix (suffixes: pir, power, light)"/></td>
+    <td><img src="info.png" title="MQTT status topic prefix, subtopics: 'pir', 'state', 'light')"/></td>
   </tr>
   <tr>
     <td>Command Topic</td>
@@ -123,7 +123,7 @@ function chk_domoticz_sub() {
   <tr>
     <td>Debug</td>
     <td><input type="checkbox" id="debug"></td>
-    <td><img src="info.png" title="whether to send debugging info on 'debug' topic"/></td>
+    <td><img src="info.png" title="whether to send debugging info on subtopics: 'restart', 'uptime', 'mem', 'fade'"/></td>
   </tr>
   <tr>
     <td colspan="3" align="center" style="background-color:lightgray">Domoticz</td>
