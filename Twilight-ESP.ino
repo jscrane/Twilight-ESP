@@ -140,10 +140,10 @@ static void flash_connecting() {
 		} else
 			Serial.println(F("Error starting MDNS"));
 
-		if (cfg.debug) {
-			mqtt_pub(retain, cfg.stat_topic, PSTR("restart"), ESP.getResetInfo().c_str());
-			debugger = timers.setInterval(cfg.interval_time, debug);
-		}
+		mqtt_pub(retain, cfg.stat_topic, PSTR("restart"), ESP.getResetInfo().c_str());
+		mqtt_pub(retain, cfg.stat_topic, PSTR("version"), PSTR(INO_VERSION));
+		if (cfg.debug)
+			debugger = timers.setInterval(60000, debug);
 
 		flash(POWER, 250, 2);
 		return;
