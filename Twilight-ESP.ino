@@ -104,6 +104,7 @@ static void debug() {
 	mqtt_pub(retain, cfg.stat_topic, PSTR("uptime"), PSTR("%d %d days %02d:%02d"), secs, days, (hours % 24), (mins % 60));
 	mqtt_pub(retain, cfg.stat_topic, PSTR("mem"), PSTR("%d/%d/%d"), ESP.getFreeHeap(), ESP.getHeapFragmentation(), ESP.getMaxFreeBlockSize());
 	mqtt_pub(retain, cfg.stat_topic, PSTR("fade"), PSTR("%d %d %d"), fade, cfg.off_bright, cfg.on_bright);
+	mqtt_pub(dont_retain, cfg.stat_topic, PSTR("rssi"), PSTR("%d"), WiFi.RSSI());
 }
 
 static void captive_portal() {
@@ -141,7 +142,8 @@ static void flash_connecting() {
 			Serial.println(F("Error starting MDNS"));
 
 		mqtt_pub(retain, cfg.stat_topic, PSTR("restart"), ESP.getResetInfo().c_str());
-		mqtt_pub(retain, cfg.stat_topic, PSTR("version"), PSTR(INO_VERSION));
+		mqtt_pub(retain, cfg.stat_topic, PSTR("built"), PSTR(BUILD_DATE));
+		mqtt_pub(retain, cfg.stat_topic, PSTR("wifi"), PSTR("%s %d %s"), WiFi.macAddress().c_str(), WiFi.channel(), WiFi.localIP().toString().c_str());
 		if (cfg.debug)
 			debugger = timers.setInterval(60000, debug);
 
