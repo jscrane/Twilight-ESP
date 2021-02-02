@@ -108,6 +108,7 @@ static void debug() {
 }
 
 static void captive_portal() {
+	WiFi.mode(WIFI_AP);
 	WiFi.softAP(cfg.hostname);
 	Serial.print(F("Connect to SSID: "));
 	Serial.print(cfg.hostname);
@@ -143,6 +144,7 @@ static void flash_connecting() {
 
 		mqtt_pub(retain, cfg.stat_topic, PSTR("restart"), ESP.getResetInfo().c_str());
 		mqtt_pub(retain, cfg.stat_topic, PSTR("built"), PSTR(BUILD_DATE));
+		mqtt_pub(retain, cfg.stat_topic, PSTR("core"), PSTR("%d"), esp8266::coreVersionNumeric());
 		mqtt_pub(retain, cfg.stat_topic, PSTR("wifi"), PSTR("%s %d %s"), WiFi.macAddress().c_str(), WiFi.channel(), WiFi.localIP().toString().c_str());
 		if (cfg.debug)
 			debugger = timers.setInterval(60000, debug);
