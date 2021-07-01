@@ -9,3 +9,4 @@ eagle/*.lck
 platform.txt.mk
 boards.txt.mk
 spiffs.img
+littlefs.img

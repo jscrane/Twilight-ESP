@@ -1,9 +1,9 @@
-#include <FS.h>
+#include <LittleFS.h>
 #include <ArduinoJson.h>
 #include "Configuration.h"
 
 bool Configuration::read_file(const char *filename) {
-	File f = SPIFFS.open(filename, "r");
+	File f = LittleFS.open(filename, "r");
 	if (!f) {
 		Serial.println("failed to open config file");
 		return false;

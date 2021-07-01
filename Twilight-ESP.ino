@@ -1,5 +1,5 @@
 #include <ArduinoJson.h>
-#include <FS.h>
+#include <LittleFS.h>
 #include <ESP8266WiFi.h>
 #include <DNSServer.h>
 #include <ESP8266mDNS.h>
@@ -22,8 +22,8 @@ config cfg;
 #define PIR	D2
 #define PIR_LED	D4
 #define POWER	D1
-#define HZ	5
-#define SAMPLES	(15*HZ)
+#define HZ	0.5
+#define SAMPLES	20
 
 static enum State {
 	START = -1,
@@ -59,7 +59,7 @@ static void flash(int pin, int ms, int n) {
 
 static volatile bool pir;
 
-void ICACHE_RAM_ATTR pir_handler() { pir = true; }
+void IRAM_ATTR pir_handler() { pir = true; }
 
 // timers
 static unsigned light;
@@ -104,7 +104,7 @@ static void debug() {
 	mqtt_pub(retain, cfg.stat_topic, PSTR("uptime"), PSTR("%d %d days %02d:%02d"), secs, days, (hours % 24), (mins % 60));
 	mqtt_pub(retain, cfg.stat_topic, PSTR("mem"), PSTR("%d/%d/%d"), ESP.getFreeHeap(), ESP.getHeapFragmentation(), ESP.getMaxFreeBlockSize());
 	mqtt_pub(retain, cfg.stat_topic, PSTR("fade"), PSTR("%d %d %d"), fade, cfg.off_bright, cfg.on_bright);
-	mqtt_pub(dont_retain, cfg.stat_topic, PSTR("rssi"), PSTR("%d"), WiFi.RSSI());
+	mqtt_pub(dont_retain, cfg.stat_topic, PSTR("rssi"), PSTR("%d"), (int)WiFi.RSSI());
 }
 
 static void captive_portal() {
@@ -230,9 +230,9 @@ void setup() {
 	flash(PIR_LED, 500, 2);
 	flash(POWER, 500, 2);
 
-	bool result = SPIFFS.begin();
+	bool result = LittleFS.begin();
 	if (!result) {
-		Serial.print(F("SPIFFS: "));
+		Serial.print(F("LittleFS: "));
 		Serial.println(result);
 		return;
 	}
@@ -295,7 +295,7 @@ void setup() {
 	server.on("/config", HTTP_POST, []() {
 		if (server.hasArg("plain")) {
 			String body = server.arg("plain");
-			File f = SPIFFS.open("/config.json", "w");
+			File f = LittleFS.open("/config.json", "w");
 			f.print(body);
 			f.close();
 			server.send(200);
@@ -303,10 +303,10 @@ void setup() {
 		} else
 			server.send(400, "text/plain", "No body!");
 	});
-	server.serveStatic("/", SPIFFS, "/index.html");
-	server.serveStatic("/config", SPIFFS, "/config.json");
-	server.serveStatic("/js/transparency.min.js", SPIFFS, "/transparency.min.js");
-	server.serveStatic("/info.png", SPIFFS, "/info.png");
+	server.serveStatic("/", LittleFS, "/index.html");
+	server.serveStatic("/config", LittleFS, "/config.json");
+	server.serveStatic("/js/transparency.min.js", LittleFS, "/transparency.min.js");
+	server.serveStatic("/info.png", LittleFS, "/info.png");
 
 	httpUpdater.setup(&server);
 	server.begin();
