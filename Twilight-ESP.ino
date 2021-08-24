@@ -57,9 +57,9 @@ static void flash(int pin, int ms, int n) {
 	}
 }
 
-static volatile bool pir;
+static volatile int pir;
 
-void IRAM_ATTR pir_handler() { pir = true; }
+void IRAM_ATTR pir_handler() { ++pir; }
 
 // timers
 static unsigned light;
@@ -193,6 +193,11 @@ static void mqtt_pub(bool ret, const char *parent, const char *child, const char
 		mqtt_client.publish(topic, msg, ret);
 		va_end(args);
 	}
+}
+
+static void pir_event(int p) {
+	mqtt_pub(dont_retain, cfg.stat_topic, PSTR("pir"), PSTR("%d"), p);
+	domoticz_pub(cfg.pir_idx, p);
 }
 
 static void mqtt_callback(char *topic, byte *payload, unsigned int length) {
@@ -358,11 +363,14 @@ void loop() {
 
 	if (pir) {
 		activity();
+		noInterrupts();
+		int p = pir;
+		pir = 0;
+		interrupts();
 		if (light > cfg.threshold && isOff())
 			state = AUTO_ON;
-		mqtt_pub(dont_retain, cfg.stat_topic, PSTR("pir"), PSTR("%d"), pir);
-		domoticz_pub(cfg.pir_idx, pir);
-		pir = false;
+		else
+			pir_event(p);
 	}
 	switch (state) {
 	case START:
@@ -406,6 +414,9 @@ void loop() {
 
 	static State last_state = START;
 	if (state != last_state) {
+		if (last_state == AUTO_ON)
+			pir_event(1);
+
 		last_state = state;
 		mqtt_pub(retain, cfg.stat_topic, PSTR("state"), PSTR("%d"), state);
 	}
