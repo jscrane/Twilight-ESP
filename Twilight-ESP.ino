@@ -57,9 +57,9 @@ static void flash(int pin, int ms, int n) {
 	}
 }
 
-static volatile int pir;
+static volatile bool pir;
 
-void IRAM_ATTR pir_handler() { ++pir; }
+void IRAM_ATTR pir_handler() { pir = true; }
 
 // timers
 static unsigned light;
@@ -363,14 +363,11 @@ void loop() {
 
 	if (pir) {
 		activity();
-		noInterrupts();
-		int p = pir;
-		pir = 0;
-		interrupts();
+		pir = false;
 		if (light > cfg.threshold && isOff())
 			state = AUTO_ON;
 		else
-			pir_event(p);
+			pir_event(1);
 	}
 	switch (state) {
 	case START:
