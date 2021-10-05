@@ -16,6 +16,5 @@
  "cmnd_topic": "cmnd/twilight/power",
  "to_domoticz": "domoticz/in",
  "from_domoticz": "domoticz/out",
- "debug": 1,
- "domoticz_sub": 0
+ "debug": 1
 }

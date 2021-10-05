@@ -163,7 +163,7 @@ static bool mqtt_connect(PubSubClient &c) {
 		return true;
 	if (c.connect(cfg.hostname)) {
 		c.subscribe(cfg.cmnd_topic);
-		if (cfg.domoticz_sub && cfg.switch_idx != -1)
+		if (cfg.switch_idx != -1)
 			c.subscribe(cfg.from_domoticz);
 		return true;
 	}
@@ -285,8 +285,6 @@ void setup() {
 	Serial.println(cfg.to_domoticz);
 	Serial.print(F("From Domoticz: "));
 	Serial.println(cfg.from_domoticz);
-	Serial.print(F("Domoticz Sub: "));
-	Serial.println(cfg.domoticz_sub);
 
 	WiFi.mode(WIFI_STA);
 	WiFi.hostname(cfg.hostname);

@@ -40,6 +40,5 @@ void config::configure(JsonDocument &o) {
 	strlcpy(cmnd_topic, o[F("cmnd_topic")] | "", sizeof(cmnd_topic));
 	strlcpy(to_domoticz, o[F("to_domoticz")] | "", sizeof(to_domoticz));
 	strlcpy(from_domoticz, o[F("from_domoticz")] | "", sizeof(from_domoticz));
-	domoticz_sub = o[F("domoticz_sub")];
 	debug = o[F("debug")];
 }

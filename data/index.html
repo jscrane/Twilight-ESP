@@ -11,7 +11,6 @@ function load_config() {
     }
     response.json().then(function(data) {
       Transparency.render(document.getElementById('config'), data);
-      chk_domoticz_sub();
     });
   }).catch(function(err) {
     console.log('Fetch error :-S', err);
@@ -33,10 +32,6 @@ function save_config() {
   xhr.open("POST", '/config', true);
   xhr.setRequestHeader('Content-Type', 'application/json');
   xhr.send(JSON.stringify(data, null, "  "));
-}
-function chk_domoticz_sub() {
-  val = document.getElementById('domoticz_sub').checked;
-  document.getElementById('from_domoticz').disabled = !val;
 }
 </script>
 </head>
@@ -147,11 +142,6 @@ function chk_domoticz_sub() {
     <td>Command Topic</td>
     <td><input type="text" id="from_domoticz" maxlength="64"></td>
     <td><img src="info.png" title="MQTT topic for Domoticz commands"/></td>
-  </tr>
-  <tr>
-    <td>Subscribe to commands</td>
-    <td><input type="checkbox" id="domoticz_sub" onclick="chk_domoticz_sub()"></td>
-    <td><img src="info.png" title="Whether to subscribe to Domoticz commands"/></td>
   </tr>
   <tr>
     <td colspan="3" align="center" style="background-color:lightgray">

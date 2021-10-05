@@ -31,7 +31,7 @@ public:
 	char cmnd_topic[TOPIC_LEN];
 	char to_domoticz[TOPIC_LEN];
 	char from_domoticz[TOPIC_LEN];
-	bool domoticz_sub, debug;
+	bool debug;
 
 	void configure(JsonDocument &o);
 };

@@ -10,3 +10,4 @@ platform.txt.mk
 boards.txt.mk
 spiffs.img
 littlefs.img
+data/config.json
