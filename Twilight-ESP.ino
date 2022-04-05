@@ -287,6 +287,7 @@ void setup() {
 	Serial.println(cfg.from_domoticz);
 
 	WiFi.mode(WIFI_STA);
+	WiFi.setSleepMode(WIFI_NONE_SLEEP);
 	WiFi.hostname(cfg.hostname);
 	if (*cfg.ssid) {
 		WiFi.setAutoReconnect(true);
